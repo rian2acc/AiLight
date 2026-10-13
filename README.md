@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest"><img src="https://img.shields.io/github/v/release/anspruchsvollwilderhai-spec/AiLight?label=release&style=flat-square" alt="Latest release"></a>
-  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest"><img src="https://img.shields.io/github/downloads/anspruchsvollwilderhai-spec/AiLight/total?style=flat-square" alt="Downloads"></a>
-  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/blob/main/LICENSE"><img src="https://img.shields.io/github/license/anspruchsvollwilderhai-spec/AiLight?style=flat-square" alt="License"></a>
+  <a href="https://github.com/rian2acc/AiLight/releases/latest"><img src="https://img.shields.io/github/v/release/rian2acc/AiLight?label=release&style=flat-square" alt="Latest release"></a>
+  <a href="https://github.com/rian2acc/AiLight/releases/latest"><img src="https://img.shields.io/github/downloads/rian2acc/AiLight/total?style=flat-square" alt="Downloads"></a>
+  <a href="https://github.com/rian2acc/AiLight/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rian2acc/AiLight?style=flat-square" alt="License"></a>
   <a href="https://dotnet.microsoft.com/download/dotnet/8.0"><img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 8"></a>
-  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/actions"><img src="https://img.shields.io/github/actions/workflow/status/anspruchsvollwilderhai-spec/AiLight/build.yml?branch=main&style=flat-square" alt="Build status"></a>
+  <a href="https://github.com/rian2acc/AiLight/actions"><img src="https://img.shields.io/github/actions/workflow/status/rian2acc/AiLight/build.yml?branch=main&style=flat-square" alt="Build status"></a>
 </p>
 
 ---
@@ -38,7 +38,7 @@
 
 ### Option A: Download installer (recommended)
 
-1. Grab **`AIlightSetup.exe`** from the [latest release](https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest) (~46 MB)
+1. Grab **`AIlightSetup.exe`** from the [latest release](https://github.com/rian2acc/AiLight/releases/latest) (~46 MB)
 2. Run it — installs to `%LOCALAPPDATA%\AIlight`, adds Start Menu + autostart
 3. On first launch, AIlight opens Settings → paste a **Groq API key** (free at [console.groq.com/keys](https://console.groq.com/keys))
 4. Press **`Alt+Space`** and start asking
@@ -47,7 +47,7 @@
 
 ```powershell
 # Prerequisites: .NET 8 SDK, Inno Setup 6
-git clone https://github.com/anspruchsvollwilderhai-spec/AiLight.git
+git clone https://github.com/rian2acc/AiLight.git
 cd AiLight
 powershell -ExecutionPolicy Bypass -File tools\build.ps1
 # Output: dist\installer\AIlightSetup.exe
