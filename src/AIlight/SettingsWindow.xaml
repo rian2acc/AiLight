@@ -1,0 +1,701 @@
+<Window
+    x:Class="AIlight.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="AIlight — Einstellungen"
+    Width="940"
+    Height="700"
+    AllowsTransparency="True"
+    Background="Transparent"
+    FontFamily="{DynamicResource Font.Ui}"
+    Foreground="{DynamicResource Brush.Text}"
+    PreviewKeyDown="OnWindowKeyDown"
+    ResizeMode="NoResize"
+    ShowInTaskbar="True"
+    SnapsToDevicePixels="True"
+    WindowStartupLocation="CenterScreen"
+    WindowStyle="None">
+
+    <!--
+      Drei Spalten: schmale Navigation links, eine Seite rechts, alles in einer
+      Karte. Kein Systemrahmen — eigener Streifen zum Ziehen, eigene Knöpfe.
+    -->
+
+    <Grid Margin="18">
+        <Border Style="{StaticResource Chrome.ShadowLayer}" />
+        <Border Style="{StaticResource Chrome.Shell}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="54" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!--  ── Titelzeile  ────────────────────────────────────────  -->
+                <Grid Grid.Row="0" MouseLeftButtonDown="OnTitleBarMouseDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel
+                        Margin="20,0,0,0"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            Foreground="{DynamicResource Brush.Accent}"
+                            Text="✦" />
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource Title}"
+                            Text="AIlight" />
+                        <TextBlock
+                            Margin="10,1,0,0"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource Caption}"
+                            Text="Einstellungen" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="1"
+                        Margin="0,0,12,0"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <Button
+                            Click="OnMinimize"
+                            Content="—"
+                            Style="{StaticResource Chrome.Button}"
+                            ToolTip="Verkleinern" />
+                        <Button
+                            Click="OnCloseSettings"
+                            Content="✕"
+                            Style="{StaticResource Chrome.Close}"
+                            ToolTip="Schließen (Esc)" />
+                    </StackPanel>
+                </Grid>
+
+                <!--  ── Navigation und Seite  ──────────────────────────────  -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="214" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border
+                        Grid.Column="0"
+                        BorderBrush="{DynamicResource Brush.Separator}"
+                        BorderThickness="0,1,1,0">
+                        <DockPanel Margin="8,10,8,10">
+                            <TextBlock
+                                x:Name="NavVersion"
+                                DockPanel.Dock="Bottom"
+                                Margin="12,10,12,0"
+                                Style="{StaticResource Caption}"
+                                Text="" />
+
+                            <StackPanel>
+                                <ToggleButton
+                                    x:Name="NavKonto"
+                                    Click="OnNavClick"
+                                    Content="Konto"
+                                    IsChecked="True"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="konto" />
+                                <ToggleButton
+                                    x:Name="NavModell"
+                                    Click="OnNavClick"
+                                    Content="Modell"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="modell" />
+                                <ToggleButton
+                                    x:Name="NavChat"
+                                    Click="OnNavClick"
+                                    Content="Gespräch"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="gespraech" />
+                                <ToggleButton
+                                    x:Name="NavVerhalten"
+                                    Click="OnNavClick"
+                                    Content="Verhalten"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="verhalten" />
+                                <ToggleButton
+                                    x:Name="NavAussehen"
+                                    Click="OnNavClick"
+                                    Content="Aussehen"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="aussehen" />
+                                <ToggleButton
+                                    x:Name="NavVerlauf"
+                                    Click="OnNavClick"
+                                    Content="Verlauf"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="verlauf" />
+                                <ToggleButton
+                                    x:Name="NavAbout"
+                                    Click="OnNavClick"
+                                    Content="Über"
+                                    Style="{StaticResource Nav.Item}"
+                                    Tag="ueber" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <ScrollViewer
+                        x:Name="PageScroll"
+                        Grid.Column="1"
+                        Padding="22,16,18,20"
+                        VerticalScrollBarVisibility="Auto">
+                        <Grid>
+
+                            <!--  ══ Konto ══════════════════════════════════  -->
+                            <StackPanel x:Name="PageKonto">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="AIlight braucht einen eigenen API-Schlüssel von Groq. Alles andere läuft ohne Konto." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="API-Schlüssel" />
+                                            <PasswordBox
+                                                x:Name="KeyBox"
+                                                Grid.Column="1"
+                                                Style="{StaticResource Field.Secret}" />
+                                        </Grid>
+                                        <WrapPanel Margin="164,10,0,0">
+                                            <Button
+                                                Click="OnSaveKey"
+                                                Content="Schlüssel speichern"
+                                                Style="{StaticResource Button.Primary}" />
+                                            <Button
+                                                x:Name="TestKeyButton"
+                                                Click="OnTestKey"
+                                                Content="Schlüssel testen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                            <Button
+                                                Click="OnDeleteKey"
+                                                Content="Entfernen"
+                                                Style="{StaticResource Button.Danger}" />
+                                        </WrapPanel>
+                                        <TextBlock
+                                            x:Name="KeyStatus"
+                                            Margin="164,10,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,6" />
+                                        <TextBlock Style="{StaticResource Caption}">
+                                            <Run Text="Der Schlüssel liegt im Windows-Anmeldeinformationsspeicher — in keiner Datei und in keinem Protokoll. Einen kostenlosen Schlüssel gibt es auf " />
+                                            <Run FontFamily="{DynamicResource Font.Mono}" Text="console.groq.com/keys" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Title}" Text="Was AIlight niemals tut" />
+                                        <TextBlock
+                                            Margin="0,6,0,0"
+                                            Style="{StaticResource Subtitle}"
+                                            Text="Keine Anmeldung, kein Konto, keine Zwischenstation: die Frage geht von diesem Rechner direkt an Groq. Der Verlauf bleibt lokal." />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Modell ═════════════════════════════════  -->
+                            <StackPanel x:Name="PageModell" Visibility="Collapsed">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="Welches Modell antwortet — und wie ausführlich." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Modell" />
+                                            <ComboBox
+                                                x:Name="ModelBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Antwortlänge" />
+                                            <ComboBox
+                                                x:Name="LengthBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Denk-Aufwand" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Wie lange das Modell vor der Antwort nachdenkt." />
+                                            </StackPanel>
+                                            <ComboBox
+                                                x:Name="ReasoningBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <CheckBox
+                                            x:Name="WebSearchCheck"
+                                            Checked="OnControlChanged"
+                                            Content="Websuche erlauben (Groq browser_search, nur gpt-oss)"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Title}" Text="System-Prompt" />
+                                        <TextBlock
+                                            Margin="0,4,0,8"
+                                            Style="{StaticResource Caption}"
+                                            Text="Wird jeder Frage vorangestellt. Leer lassen für den eingebauten Standard." />
+                                        <TextBox
+                                            x:Name="PromptBox"
+                                            LostFocus="OnControlChanged"
+                                            Style="{StaticResource Field.Multiline}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Gespräch ═══════════════════════════════  -->
+                            <StackPanel x:Name="PageChat" Visibility="Collapsed">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="Wie viel AIlight sich merkt — und was mitgesendet wird." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Runden im Gedächtnis" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Nur diese letzten Frage-Antwort-Paare gehen bei einer neuen Frage mit." />
+                                            </StackPanel>
+                                            <ComboBox
+                                                x:Name="MemoryBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <WrapPanel>
+                                            <Button
+                                                Click="OnClearConversation"
+                                                Content="Gespräch jetzt leeren"
+                                                Style="{StaticResource Button.Ghost}" />
+                                        </WrapPanel>
+                                        <TextBlock
+                                            Margin="0,6,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="Der Verlauf bleibt dabei erhalten — nur das Kurzzeitgedächtnis wird leer." />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Title}" Text="Nachsehen" />
+                                        <TextBlock
+                                            Margin="0,6,0,0"
+                                            Style="{StaticResource Subtitle}"
+                                            Text="Der Befehl /conversation zeigt genau, was gerade mitgesendet würde." />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Verhalten ══════════════════════════════  -->
+                            <StackPanel x:Name="PageVerhalten" Visibility="Collapsed">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="Wie sich die Leiste verhält." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Hotkey" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Ins Feld klicken und die Kombination drücken." />
+                                            </StackPanel>
+                                            <TextBox
+                                                x:Name="HotkeyBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                IsReadOnly="True"
+                                                PreviewKeyDown="OnHotkeyBoxKeyDown"
+                                                Style="{StaticResource Field.Text}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="HotkeyStatus"
+                                            Margin="164,10,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="Zum Beispiel Strg+Alt+K oder Alt+Space." />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock
+                                            Margin="0,2,0,10"
+                                            Style="{StaticResource Title}"
+                                            Text="Start und Verhalten" />
+                                        <CheckBox
+                                            x:Name="StartCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Mit Windows starten"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="PreloadCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Leiste im Hintergrund vorbereiten (erster Aufruf sofort da)"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="HideCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Leiste schließen, wenn der Fokus verloren geht"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="LogCheck"
+                                            Checked="OnControlChanged"
+                                            Content="Protokolldatei schreiben (nur Ereignisse und Fehler)"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <WrapPanel>
+                                            <Button
+                                                Click="OnOpenLog"
+                                                Content="Protokoll ansehen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Aussehen ═══════════════════════════════  -->
+                            <StackPanel x:Name="PageAussehen" Visibility="Collapsed">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="Farben und Maße der Leiste — jede Änderung wirkt sofort." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock
+                                            Margin="0,2,0,12"
+                                            Style="{StaticResource Title}"
+                                            Text="Vorschau" />
+                                        <Border
+                                            x:Name="PreviewCard"
+                                            Width="420"
+                                            HorizontalAlignment="Left"
+                                            Background="{DynamicResource Brush.Surface}"
+                                            BorderBrush="{DynamicResource Brush.Border}"
+                                            BorderThickness="1"
+                                            CornerRadius="14">
+                                            <StackPanel>
+                                                <Grid Height="46">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="44" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="16"
+                                                        Foreground="{DynamicResource Brush.Accent}"
+                                                        Text="✦" />
+                                                    <TextBlock
+                                                        x:Name="PreviewText"
+                                                        Grid.Column="1"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="17"
+                                                        Foreground="{DynamicResource Brush.Muted}"
+                                                        Text="Frage stellen — oder /help" />
+                                                    <TextBlock
+                                                        x:Name="PreviewMeta"
+                                                        Grid.Column="2"
+                                                        Margin="8,0,16,0"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="12"
+                                                        Foreground="{DynamicResource Brush.Muted}"
+                                                        Text="20b · 0,4 s" />
+                                                </Grid>
+                                                <Border
+                                                    Background="{DynamicResource Brush.Code}"
+                                                    CornerRadius="0,0,13,13"
+                                                    Height="24">
+                                                    <TextBlock
+                                                        x:Name="PreviewHint"
+                                                        Margin="14,0"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="10"
+                                                        Foreground="{DynamicResource Brush.Muted}"
+                                                        Text="Enter fragt · Strg+, Einstellungen · Esc schließt" />
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock
+                                            Margin="0,10,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="Breite, Schriftgröße und Deckkraft wirken hier sofort mit." />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Farben" />
+                                            <ComboBox
+                                                x:Name="ThemeBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock VerticalAlignment="Top" Style="{StaticResource Label}" Text="Akzentfarbe" />
+                                            <WrapPanel
+                                                x:Name="AccentPanel"
+                                                Grid.Column="1"
+                                                Margin="0,2,0,0" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Breite" />
+                                            <Slider
+                                                x:Name="WidthSlider"
+                                                Grid.Column="1"
+                                                Maximum="1200"
+                                                Minimum="420"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="WidthValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Abstand von oben" />
+                                            <Slider
+                                                x:Name="TopSlider"
+                                                Grid.Column="1"
+                                                Maximum="40"
+                                                Minimum="0"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="TopValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Schriftgröße" />
+                                            <Slider
+                                                x:Name="FontSlider"
+                                                Grid.Column="1"
+                                                Maximum="28"
+                                                Minimum="12"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="FontValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Deckkraft" />
+                                            <Slider
+                                                x:Name="OpacitySlider"
+                                                Grid.Column="1"
+                                                Maximum="1"
+                                                Minimum="0.6"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="OpacityValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Verlauf ════════════════════════════════  -->
+                            <StackPanel x:Name="PageVerlauf" Visibility="Collapsed">
+                                <TextBlock
+                                    Margin="2,0,0,10"
+                                    Style="{StaticResource Subtitle}"
+                                    Text="Jede Frage wird lokal mitgeschrieben — hier bestimmst du, wie lange." />
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Aufbewahrung" />
+                                            <ComboBox
+                                                x:Name="KeepBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="StatsText"
+                                            Margin="0,12,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <WrapPanel>
+                                            <Button
+                                                Click="OnOpenDataFolder"
+                                                Content="Ordner öffnen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                            <Button
+                                                Click="OnClearHistory"
+                                                Content="Verlauf löschen"
+                                                Style="{StaticResource Button.Danger}" />
+                                        </WrapPanel>
+                                        <TextBlock
+                                            Margin="0,8,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="Diese Datei liegt in deinem Benutzerprofil und überlebt eine Neuinstallation." />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!--  ══ Über ═══════════════════════════════════  -->
+                            <StackPanel x:Name="PageAbout" Visibility="Collapsed">
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="18"
+                                                Foreground="{DynamicResource Brush.Accent}"
+                                                Text="✦" />
+                                            <TextBlock
+                                                Margin="10,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource Title}"
+                                                Text="AIlight" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            x:Name="AboutText"
+                                            Margin="0,10,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <WrapPanel>
+                                            <Button
+                                                Click="OnOpenDataFolder"
+                                                Content="Einstellungsordner"
+                                                Style="{StaticResource Button.Ghost}" />
+                                            <Button
+                                                Click="OnOpenLog"
+                                                Content="Protokoll ansehen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

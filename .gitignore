@@ -1,0 +1,9 @@
+# Baureste — entstehen bei jedem Bau neu (tools/build.ps1)
+bin/
+obj/
+dist/
+*.user
+*.suo
+
+# Arbeitsdaten der Entwicklungsumgebung
+.freebuff/

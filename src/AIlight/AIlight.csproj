@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WPF-Leiste + WinForms nur für das Infobereich-Symbol (Tray) — beides im SDK enthalten. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <!-- Eigene globale Usings statt der Vorlagen: WPF und WinForms (nur Tray) importieren
+         sonst beide ihre eigenen Typen und der Compiler wird mehrdeutig. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <AssemblyName>AIlight</AssemblyName>
+    <RootNamespace>AIlight</RootNamespace>
+    <Version>1.0.0</Version>
+    <Company>AIlight</Company>
+    <Product>AIlight</Product>
+    <Description>KI-Leiste für Windows — Hotkey, Frage, gestreamte Antwort</Description>
+    <ApplicationIcon>..\..\packaging\ailight.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <DebugType>none</DebugType>
+    <!-- Eine Leiste, die im Infobereich wartet, soll so wenig wie möglich halten:
+         kein Hintergrund-GC-Thread, keine Arbeits-Threads auf Vorrat. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <RetainVMGarbageCollection>false</RetainVMGarbageCollection>
+    <ThreadPoolMinThreads>2</ThreadPoolMinThreads>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Nur eine Warnstufe: unbenutzte Felder usw. nicht als Fehler behandeln. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
