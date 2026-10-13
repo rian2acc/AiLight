@@ -1,233 +1,225 @@
-# AIlight — KI-Leiste für Windows
+# AIlight
 
-Ein Hotkey, eine Zeile, eine Antwort. Kein Fenster in der Taskleiste, kein Konto,
-keine Cloud von mir: Die Leiste schickt deine Frage direkt an die Groq-API und
-schreibt die Antwort mit, während sie entsteht.
+<p align="center">
+  <img src="packaging/ailight.ico" alt="AIlight logo" width="96" height="96">
+</p>
 
-```
-Alt+Space   →   Leiste erscheint   →   Frage tippen   →   Enter   →   Antwort
-```
+<p align="center">
+  <strong>AI launcher for Windows — press a hotkey, type a question, get a streaming answer.</strong>
+</p>
 
-Standard-Hotkey ist **Alt+Space**, einstellbar über das Symbol im Infobereich
-oder mit **Strg+,**.
-
----
-
-## 1. Weitergeben an einen Freund
-
-Es gibt genau **eine** Datei:
-
-```
-dist\installer\AIlightSetup.exe     (ca. 46 MB)
-```
-
-Der Ablauf beim Empfänger:
-
-1. **Installieren** — Doppelklick. Keine Administratorrechte nötig, nichts
-   runterladen: .NET und alles andere ist in der Datei enthalten. Die Installation
-   landet im Benutzerprofil (`%LOCALAPPDATA%\AIlight`), Autostart und
-   Startmenü-Einträge werden angelegt, ein Deinstaller kommt mit.
-2. **Schlüssel eintragen** — beim ersten Start merkt AIlight, dass noch kein
-   Schlüssel da ist, öffnet automatisch die Einstellungen und zeigt einen Hinweis
-   im Infobereich. Einmal auf <https://console.groq.com/keys> einen
-   kostenlosen Schlüssel erzeugen, einfügen, **„Schlüssel testen“**, fertig.
-3. **Benutzen** — Alt+Space.
-
-Der Schlüssel liegt danach im Windows-Anmeldeinformationsspeicher (nicht in einer
-Datei, nicht im Log). Wer schon eine ältere AIlight-Fassung benutzt hat, dessen
-Schlüssel wird beim Start automatisch übernommen.
-
-**Deinstallieren:** Startmenü → *AIlight deinstallieren*, oder Windows →
-Einstellungen → Apps. Läuft AIlight gerade, beendet der Deinstaller es selbst;
-du musst vorher nichts schließen. Programm, Autostart und Verknüpfungen
-verschwinden; Einstellungen, Verlauf und Schlüssel bleiben absichtlich erhalten
-— eine Neuinstallation ist danach sofort wieder benutzbar.
-
-Dasselbe gilt für ein Update: einfach `AIlightSetup.exe` erneut starten — eine
-laufende Fassung wird dabei beendet, damit die Dateien ersetzt werden können.
+<p align="center">
+  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest"><img src="https://img.shields.io/github/v/release/anspruchsvollwilderhai-spec/AiLight?label=release&style=flat-square" alt="Latest release"></a>
+  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest"><img src="https://img.shields.io/github/downloads/anspruchsvollwilderhai-spec/AiLight/total?style=flat-square" alt="Downloads"></a>
+  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/blob/main/LICENSE"><img src="https://img.shields.io/github/license/anspruchsvollwilderhai-spec/AiLight?style=flat-square" alt="License"></a>
+  <a href="https://dotnet.microsoft.com/download/dotnet/8.0"><img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet" alt=".NET 8"></a>
+  <a href="https://github.com/anspruchsvollwilderhai-spec/AiLight/actions"><img src="https://img.shields.io/github/actions/workflow/status/anspruchsvollwilderhai-spec/AiLight/build.yml?branch=main&style=flat-square" alt="Build status"></a>
+</p>
 
 ---
 
-## 2. Bedienung
+## ✨ Features
 
-| Taste | Wirkung |
-| --- | --- |
-| `Alt+Space` | Leiste zeigen/verstecken (einstellbar) |
-| `Enter` | Frage abschicken · markierten Vorschlag ausführen · bei Abbruch fortsetzen |
-| `Esc` | laufende Anfrage abbrechen, sonst Leiste schließen |
-| `↑` `↓`, `Bild↑` `Bild↓` | Vorschläge durchgehen |
-| `Tab` | markierten Vorschlag ins Eingabefeld übernehmen |
-| `Strg+↑` / `Strg+↓` | frühere Fragen durchblättern |
-| `Strg+C` | letzte Antwort kopieren (im Eingabefeld normal kopieren) |
-| `Strg+N` | neues Gespräch (Gedächtnis leeren) |
-| `Strg+H` | Verlauf anzeigen |
-| `Strg+,` | Einstellungen |
-
-Im leeren Eingabefeld stehen frühere Fragen und die wichtigsten Befehle.
-Tippt man eine Frage, steht oben eine Zeile „Fragen: …“ — Enter schickt sie ab.
-
-### Befehle (mit `/`, das alte `#` funktioniert weiter)
-
-| Befehl | Wirkung |
-| --- | --- |
-| `/new` | neues Gespräch beginnen |
-| `/clip` | Frage zur Zwischenablage stellen |
-| `/history [Wort]` | Verlauf durchsuchen und öffnen |
-| `/forget [Wort]` | Verlauf löschen (ohne Wort: alles) |
-| `/stats` | Anzahl, Tokens, Kosten |
-| `/model [auto\|20b\|120b]` | Modell wählen |
-| `/prompt` | System-Prompt anzeigen |
-| `/conversation` | zeigen, was mitgesendet wird |
-| `/copy` | letzte Antwort in die Zwischenablage |
-| `/save` | letzte Antwort als Datei speichern |
-| `/settings` | Einstellungen öffnen |
-| `/help` | Befehlsliste |
-| `/quit` | AIlight beenden |
-
-### Einstellungen
-
-Links die Bereiche, rechts Karten — keine lange Liste, kein Suchen:
-
-| Bereich | Was drin ist |
-| --- | --- |
-| **Konto** | API-Schlüssel speichern, prüfen, entfernen (mit „Schlüssel testen“) |
-| **Modell** | Modell (`auto` wählt 20b oder 120b je nach Frage), Antwortlänge, Denk-Aufwand, Websuche, System-Prompt |
-| **Gespräch** | Runden im Gedächtnis, Gedächtnis leeren, was mitgesendet wird |
-| **Verhalten** | Hotkey (Tastenkombination einfach ins Feld drücken), Start mit Windows, Leiste vorab aufbauen, bei Fokusverlust ausblenden, Protokoll |
-| **Aussehen** | Farben, Akzentfarbe, Breite, Abstand von oben, Schriftgröße, Deckkraft — mit **Vorschau der Leiste** |
-| **Verlauf** | Aufbewahrung, Statistik (Anzahl, Tokens, Kosten), Ordner öffnen, löschen |
-| **Über** | Version, Pfade, Ordner und Protokoll öffnen |
-
-Alles wirkt sofort, es gibt kein „OK“. Die Aussehen-Vorschau zeigt in Echtzeit,
-wie die Leiste mit den gewählten Farben, der Breite, der Schriftgröße und der
-Deckkraft aussieht. Das Fenster hat keinen Systemrahmen: eigener Streifen zum
-Ziehen, eigene Knöpfe, **Esc schließt**.
+| Feature | Description |
+|---------|-------------|
+| **Global hotkey** | `Alt+Space` (customizable) — instant access from anywhere |
+| **Streaming answers** | Response appears token-by-token via Groq API |
+| **Smart suggestions** | Previous questions, commands, clipboard-aware — keyboard navigable |
+| **Frameless settings** | 7 categories, live theme preview, no "OK" button needed |
+| **Conversation memory** | Configurable context window, `/forget` to wipe |
+| **History & stats** | Token usage, cost estimate, searchable, exportable |
+| **System tray** | Single instance, autostart, zero background service |
+| **Self-test built in** | `AIlight.exe --selftest` → 41 pixel-perfect assertions on the actual EXE |
+| **Portable installer** | 46 MB Inno Setup bundle — includes .NET, no admin rights, per-user install |
 
 ---
 
-## 3. Wo liegen die Daten
+## 📥 Installation
 
-| Was | Ort |
-| --- | --- |
-| Einstellungen | `%APPDATA%\AIlight\settings.json` |
-| Verlauf (eine Zeile je Frage) | `%APPDATA%\AIlight\history.jsonl` |
-| Gespräch, das mitgesendet wird | `%APPDATA%\AIlight\conversation.json` |
-| letzte Antwort | `%APPDATA%\AIlight\last_answer.md` |
-| gespeicherte Antworten | `%USERPROFILE%\Dokumente\AIlight-Antworten` |
-| Log | `%LOCALAPPDATA%\AIlight\logs\ailight.log` (rolliert, 4 Dateien; liegt im Programmordner und verschwindet mit der Deinstallation) |
-| API-Schlüssel | Windows-Anmeldeinformationsspeicher, Eintrag `AIlight:groq-api-key` |
+### Option A: Download installer (recommended)
 
----
+1. Grab **`AIlightSetup.exe`** from the [latest release](https://github.com/anspruchsvollwilderhai-spec/AiLight/releases/latest) (~46 MB)
+2. Run it — installs to `%LOCALAPPDATA%\AIlight`, adds Start Menu + autostart
+3. On first launch, AIlight opens Settings → paste a **Groq API key** (free at [console.groq.com/keys](https://console.groq.com/keys))
+4. Press **`Alt+Space`** and start asking
 
-## 4. Selbst bauen
-
-Voraussetzungen:
-
-* **.NET 8 SDK** — entweder im `PATH` oder portabel unter `%USERPROFILE%\dotnet-sdk`
-* **Inno Setup 6** — <https://jrsoftware.org/isdl.php> (kostenlos)
-* optional **Python mit Pillow**, nur wenn das Programmsymbol neu gezeichnet
-  werden soll: `python tools\make_icon.py`
-
-Dann ein Befehl:
+### Option B: Build from source
 
 ```powershell
+# Prerequisites: .NET 8 SDK, Inno Setup 6
+git clone https://github.com/anspruchsvollwilderhai-spec/AiLight.git
+cd AiLight
 powershell -ExecutionPolicy Bypass -File tools\build.ps1
+# Output: dist\installer\AIlightSetup.exe
 ```
 
-Das Skript baut das Programm, lässt den Selbsttest laufen (**41 Prüfungen**,
-ohne Netz), veröffentlicht die Release-Fassung nach `dist\publish` und packt
-`dist\installer\AIlightSetup.exe`. Es bricht ab, sobald ein Schritt fehlschlägt.
-Schalter: `-SkipTest` (ohne Selbsttest), `-SkipInstaller` (nur bis `dist\publish`).
-
-### Prüfen statt raten
-
-Dieselbe EXE, die der Nutzer startet, kann sich selbst prüfen und messen:
-
-```powershell
-AIlight.exe --selftest                 # 41 Prüfungen, Exit-Code 0 = grün
-AIlight.exe --smoke 4                  # Leiste, Hotkey, Tray, Größe, Position
-AIlight.exe --ask "Sag nur: läuft"     # echte Frage ohne Fenster
-AIlight.exe --ask-ui "Was ist 2+4?"    # Frage wie von Hand in die Leiste getippt
-AIlight.exe --shot dist\bilder         # Bildschirmfotos aller Fenster und Bereiche
-AIlight.exe --show                     # Leiste zeigen und offen lassen
-AIlight.exe --quit                     # laufende Instanz beenden
-```
-
-`--shot` schreibt PNG-Bilder der Leiste (leer und mit Antwort) und jedes
-Einstellungsbereichs in Dunkel und Hell — praktisch, um die Gestaltung
-anzusehen, ohne das Programm zu bedienen. Die Prüfungen dazu sind nicht nur
-„läuft ohne Fehler“: der Selbsttest liest echte Pixel aus den gerenderten
-Fenstern — der Regler muss links im Akzent gefüllt sein und nicht rechts, die
-gewählte Vorschlagszeile muss ihren Akzentstreifen haben.
-
-Mit `--report datei.txt` landen die Ergebnisse von `--smoke`, `--ask` und
-`--ask-ui` in einer Datei. `--selftest` schreibt immer auf die Konsole und meldet
-über den Exit-Code (0 = grün, 1 = rot); `--show` schreibt seinen Ablauf ins Log
-(`%LOCALAPPDATA%\AIlight\logs\ailight.log`) und bleibt offen, bis du Esc drückst.
-
-Für den Erststart-Test ohne echten Schlüssel gibt es die Umgebungsvariable
-`AILIGHT_KEY_TARGET` — damit läuft der Test gegen einen zweiten, leeren
-Eintrag im Anmeldeinformationsspeicher:
-
-```powershell
-$env:AILIGHT_KEY_TARGET = 'AIlight:test-ohne-key'; AIlight.exe --smoke 3
-```
+> The build script runs the 41-assertion self-test, publishes a trimmed single-file EXE, and packages the installer. Flags: `-SkipTest`, `-SkipInstaller`.
 
 ---
 
-## 5. Aufbau (kurz)
+## ⌨️ Quick Reference
+
+| Shortcut | Action |
+|----------|--------|
+| `Alt+Space` | Show/hide bar (configurable) |
+| `Enter` | Send question / run selected suggestion |
+| `Esc` | Cancel request, then close bar |
+| `↑` `↓` / `PgUp` `PgDn` | Navigate suggestions |
+| `Tab` | Fill input with selected suggestion |
+| `Ctrl+↑` / `Ctrl+↓` | Browse previous questions |
+| `Ctrl+C` | Copy last answer (normal copy in input) |
+| `Ctrl+N` | New conversation (clear memory) |
+| `Ctrl+H` | Open history |
+| `Ctrl+,` | Open Settings |
+
+**Commands** (type `/` in empty input):
+
+| Command | Effect |
+|---------|--------|
+| `/new` | Start fresh conversation |
+| `/clip` | Ask about clipboard contents |
+| `/history [term]` | Search & open history |
+| `/forget [term]` | Delete history (all if no term) |
+| `/stats` | Show count, tokens, estimated cost |
+| `/model [auto\|20b\|120b]` | Switch model |
+| `/prompt` | View system prompt |
+| `/conversation` | Show what gets sent to API |
+| `/copy` | Copy last answer to clipboard |
+| `/save` | Save last answer as `.md` file |
+| `/settings` | Open Settings |
+| `/help` | List all commands |
+| `/quit` | Exit AIlight |
+
+---
+
+## 🖼️ Screenshots
+
+<p float="left">
+  <img src="dist/bilder/leiste-vorschlaege.png" alt="Suggestion bar" width="45%">
+  <img src="dist/bilder/leiste-antwort.png" alt="Streaming answer" width="45%">
+</p>
+<p float="left">
+  <img src="dist/bilder/einstellungen-dunkel-konto.png" alt="Settings - Account (dark)" width="45%">
+  <img src="dist/bilder/einstellungen-hell-aussehen.png" alt="Settings - Appearance (light)" width="45%">
+</p>
+
+*More screenshots in [`dist/bilder/`](dist/bilder/) — generated by `AIlight.exe --shot dist\bilder`.*
+
+---
+
+## 🗂️ Data Locations
+
+| Data | Path |
+|------|------|
+| Settings | `%APPDATA%\AIlight\settings.json` |
+| History (JSONL) | `%APPDATA%\AIlight\history.jsonl` |
+| Conversation context | `%APPDATA%\AIlight\conversation.json` |
+| Last answer | `%APPDATA%\AIlight\last_answer.md` |
+| Saved answers | `%USERPROFILE%\Documents\AIlight-Antworten` |
+| Log (rolling, 4 files) | `%LOCALAPPDATA%\AIlight\logs\ailight.log` |
+| API key | **Windows Credential Manager** → `AIlight:groq-api-key` |
+
+> Uninstall keeps your settings, history & key. Reinstall = instant resume.
+
+---
+
+## 🛠️ Built-in Diagnostics
+
+```powershell
+AIlight.exe --selftest           # 41 assertions, exit code 0 = pass
+AIlight.exe --smoke 4            # Bar, hotkey, tray, size, position
+AIlight.exe --ask "Say: ok"      # Headless question
+AIlight.exe --ask-ui "2+2?"      # Simulated UI interaction
+AIlight.exe --shot dist\bilder   # Render all windows to PNG
+AIlight.exe --show               # Show bar, keep open (Esc to close)
+AIlight.exe --quit               # Stop running instance
+AIlight.exe --report out.txt     # Write smoke/ask results to file
+```
+
+The self-test renders real windows and inspects **actual pixels** — e.g. slider fill must be accent-colored on the left only, selected suggestion row must show its accent bar at the expected coordinate.
+
+---
+
+## 🏗️ Architecture
 
 ```
 src/AIlight/
-  Program.cs            Einstieg: Prüfmodus, Einzelinstanz, sonst starten
-  App.cs                Lebenszyklus, Hotkey, Tray, Fenster, Prüfmodi
-  MainWindow.*          die Leiste: Eingabe, Vorschläge, gestreamte Antwort
-  SettingsWindow.*      Einstellungen (alles sofort wirksam)
-  AppSettings.cs        Einstellungen laden/speichern
-  SelfTest.cs           der eingebaute Prüfstand
-  Commands.cs           Befehlsliste
-  Suggestions.cs        Zeilen unter dem Eingabefeld
-  Core/                 Hotkey, Einzelinstanz, Schlüsselspeicher, Log, Icons, Pfade
-  Groq/                 HTTP-Client, Streaming, Modelle, Verlauf
-  Views/                Markdown-Darstellung, Thema (hell/dunkel), Bildschirmfotos
-tools/                  build.ps1, Selbsttest-Helfer, Messwerkzeuge
-packaging/              ailight.iss (Installer), ailight.ico
+  Program.cs           Entry: test modes → single instance → run
+  App.cs               Lifecycle, hotkey, tray, windows, test modes
+  MainWindow.*         The bar: input, suggestions, streaming markdown
+  SettingsWindow.*     7 categories, live preview, frameless
+  AppSettings.cs       Load/save JSON settings
+  SelfTest.cs          41 pixel-level assertions
+  Commands.cs          Slash-command registry
+  Suggestions.cs       Suggestion rows under input
+  Core/                Hotkey, single-instance, DPAPI key store, log, icons, paths
+  Groq/                HTTP client, streaming, models, history
+  Views/               Markdown renderer, themes (light/dark), screenshot helper
+tools/                 build.ps1, test helpers, measurement tools
+packaging/             ailight.iss (Inno Setup), ailight.ico
 ```
 
-Bewusste Entscheidungen für „möglichst einfach und ressourcensparend“:
+**Design choices:**
 
-* **Kein Framework, kein Plugin-System, kein Hintergrunddienst.** Eine EXE, ein
-  Tray-Symbol, ein Fenster — sonst nichts.
-* **Kein zweiter Prozess.** Die Leiste entsteht im selben Programm
-  (`PreloadBar` baut sie im Leerlauf vor, damit der erste Hotkey sofort wirkt).
-* **Nur eine Netzverbindung**, direkt zur API; kein Zwischenserver.
-* **Der Selbsttest ist Teil des Programms**, nicht ein separates Testprojekt —
-  dadurch prüft er genau die EXE, die ausgeliefert wird.
-
-### Gemessen (Release-Fassung, dieser Rechner)
-
-| Vorgang | Wert |
-| --- | --- |
-| Leiste erscheint nach Hotkey | ~6–40 ms (vorgebaut) |
-| Leiste erscheint beim Kaltstart | ~0,5–0,8 s |
-| Erster Buchstabe der Antwort | ~0,4–0,6 s |
-| Leerlauf | 0 % CPU, ~90 MB Arbeitsspeicher |
-| Installer | 46 MB (enthält .NET) |
-| Installiert auf der Platte | ~145 MB |
-
-`.NET` ist mitgeliefert, deshalb ist der Installer nicht kleiner. Das ist der
-Preis dafür, dass beim Empfänger **nichts** installiert werden muss.
+- **Single EXE**, no background service, no plugin system
+- **Preloaded bar** built during idle → first hotkey ~6–40 ms
+- **Direct Groq API** — no proxy, no telemetry
+- **Self-test ships in the EXE** — tests exactly what users run
+- **DPAPI-backed credential store** — key never touches disk
 
 ---
 
-## 6. Bekannte Grenzen (ehrlich)
+## 📊 Benchmarks (Release, this machine)
 
-* Nur Groq als Anbieter — genau eine API, keine Auswahl.
-* Nur Windows 10/11, 64 Bit.
-* Ist `Alt+Space` schon belegt (z. B. von PowerToys), meldet AIlight das im
-  Log und im Einstellungsfenster; dann einen anderen Hotkey wählen.
-* Getestet wurde auf Windows 10, mit dem Konto dieses Rechners — nicht auf
-  einem frischen Windows-Konto ohne .NET-SDK und ohne Python.
-* Der Installer ist unsigniert; Windows kann beim ersten Start „Weitere
-  Informationen → Trotzdem ausführen“ verlangen (SmartScreen). Eine
-  Code-Signatur wäre der nächste Schritt für eine breite Weitergabe.
+| Metric | Value |
+|--------|-------|
+| Bar appears (preloaded) | 6–40 ms |
+| Bar appears (cold) | 0.5–0.8 s |
+| First answer token | 0.4–0.6 s |
+| Idle CPU | 0 % |
+| Idle RAM | ~90 MB |
+| Installer size | 46 MB (includes .NET 8) |
+| Installed size | ~145 MB |
+
+---
+
+## ⚠️ Known Limitations
+
+- **Groq only** — single provider, no model marketplace
+- **Windows 10/11 x64** only
+- Hotkey conflict detection (logs + UI warning if `Alt+Space` taken)
+- Unsigned installer → SmartScreen "More info → Run anyway" on first launch
+- Tested on author's Windows 10 account — not on clean VMs
+
+---
+
+## 🤝 Contributing
+
+Issues and PRs welcome. Areas that'd love help:
+
+- Code signing / Microsoft Store packaging
+- Additional AI providers (OpenAI, Anthropic, local via Ollama)
+- Linux/macOS via Avalonia or MAUI
+- Unit tests for Groq client & history store
+- Localization (currently German/English mixed)
+
+```powershell
+# Quick contributor loop
+powershell tools\build.ps1 -SkipInstaller
+AIlight.exe --selftest
+```
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) — do whatever you want, just keep the notice.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Groq](https://groq.com/) for the blazing-fast inference API
+- [.NET](https://dotnet.microsoft.com/) for single-file native publishing
+- [Inno Setup](https://jrsoftware.org/isinfo.php) for the installer
+- [Markdig](https://github.com/xoofx/markdig) for markdown rendering

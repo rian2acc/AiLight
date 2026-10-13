@@ -1,0 +1,86 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  INNO_SETUP_VERSION: '6.2.2'
+
+jobs:
+  build:
+    name: Build & Self-Test
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore src/AIlight/AIlight.csproj
+
+      - name: Build (Release)
+        run: dotnet build src/AIlight/AIlight.csproj -c Release --no-restore
+
+      - name: Run Self-Test (41 assertions)
+        run: |
+          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish -p:PublishSingleFile=true -p:PublishTrimmed=true --self-contained true -r win-x64
+          cd dist/publish
+          .\AIlight.exe --selftest
+
+      - name: Upload test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-output
+          path: dist/publish/
+          retention-days: 7
+
+  package:
+    name: Create Installer
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    if: github.event_name == 'release' || github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --version=${{ env.INNO_SETUP_VERSION }} -y
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build installer
+        run: |
+          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish -p:PublishSingleFile=true -p:PublishTrimmed=true --self-contained true -r win-x64
+          iscc packaging/ailight.iss
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIlightSetup
+          path: dist/installer/AIlightSetup.exe
+          retention-days: 30
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/installer/AIlightSetup.exe
