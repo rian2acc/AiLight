@@ -30,14 +30,18 @@ public partial class SettingsWindow : Window
     private bool _keyShownOnce;
     private string _page = "konto";
 
+    /// <summary>Die Akzentfarben von macOS — von Blau bis Graphit.</summary>
     private static readonly (string Label, string Hex)[] Accents =
     {
-        ("Blau", "#4C8DFF"),
-        ("Türkis", "#2ED3B7"),
-        ("Grün", "#4CC38A"),
-        ("Orange", "#F2A33C"),
-        ("Rot", "#F2686B"),
-        ("Violett", "#A98BFF"),
+        ("Blau", "#0A84FF"),
+        ("Türkis", "#64D2FF"),
+        ("Grün", "#30D158"),
+        ("Gelb", "#FFD60A"),
+        ("Orange", "#FF9F0A"),
+        ("Rot", "#FF453A"),
+        ("Pink", "#FF375F"),
+        ("Lila", "#BF5AF2"),
+        ("Graphit", "#8E8E93"),
     };
 
     /// <summary>Die Bereiche des Fensters — Reihenfolge wie in der Navigation.</summary>
@@ -162,6 +166,12 @@ public partial class SettingsWindow : Window
             ("1 Jahr", "365"));
 
         Fill(ThemeBox, ("Wie Windows", "system"), ("Hell", "hell"), ("Dunkel", "dunkel"));
+
+        Fill(FontBox,
+            ("System (empfohlen)", "system"),
+            ("Segoe UI", "segoe"),
+            ("Calibri", "calibri"),
+            ("Arial", "arial"));
     }
 
     private void BuildAccents()
@@ -210,6 +220,12 @@ public partial class SettingsWindow : Window
         TopSlider.Value = _settings.TopPercent;
         FontSlider.Value = _settings.FontSize;
         OpacitySlider.Value = _settings.Opacity;
+        CornerSlider.Value = _settings.CornerRadius;
+        FontBox.SelectedItem = ItemWithTag(FontBox, _settings.FontFamily) ?? FontBox.Items[0];
+
+        AnimateCheck.IsChecked = _settings.AnimateBar;
+        ThinkingCheck.IsChecked = _settings.ShowThinking;
+        MetaCheck.IsChecked = _settings.ShowMeta;
 
         HotkeyBox.Text = _settings.Hotkey;
         StartCheck.IsChecked = _settings.StartWithWindows;
@@ -245,6 +261,11 @@ public partial class SettingsWindow : Window
         TopValue.Text = $"{TopSlider.Value:0} %";
         FontValue.Text = $"{FontSlider.Value:0}";
         OpacityValue.Text = $"{OpacitySlider.Value:P0}";
+        CornerValue.Text = $"{CornerSlider.Value:0}";
+
+        // Die Vorschau folgt auch dem Ecken-Radius — so sieht man sofort,
+        // wie rund die Leiste wirklich wird.
+        PreviewCard.CornerRadius = new CornerRadius(CornerSlider.Value);
 
         // Die Vorschau soll wirklich zeigen, was eingestellt ist — deshalb folgt
         // sie Breite, Schriftgröße und Deckkraft direkt.
@@ -331,6 +352,10 @@ public partial class SettingsWindow : Window
         _settings.MemoryRounds = int.TryParse(TagOf(MemoryBox, "3"), out var rounds) ? rounds : 3;
         _settings.KeepHistoryDays = int.TryParse(TagOf(KeepBox, "0"), out var days) ? days : 0;
         _settings.Theme = TagOf(ThemeBox, "system");
+        _settings.FontFamily = TagOf(FontBox, "system");
+        _settings.AnimateBar = AnimateCheck.IsChecked == true;
+        _settings.ShowThinking = ThinkingCheck.IsChecked == true;
+        _settings.ShowMeta = MetaCheck.IsChecked == true;
         _settings.WebSearch = WebSearchCheck.IsChecked == true;
         _settings.SystemPrompt = PromptBox.Text.Trim();
         _settings.StartWithWindows = StartCheck.IsChecked == true;
@@ -355,6 +380,7 @@ public partial class SettingsWindow : Window
         _settings.TopPercent = Math.Round(TopSlider.Value);
         _settings.FontSize = Math.Round(FontSlider.Value);
         _settings.Opacity = Math.Round(OpacitySlider.Value, 2);
+        _settings.CornerRadius = Math.Round(CornerSlider.Value);
         UpdateSliderLabels();
     }
 
@@ -494,6 +520,12 @@ public partial class SettingsWindow : Window
     }
 
     private void OnOpenDataFolder(object sender, RoutedEventArgs e) => Open(Paths.DataFolder);
+
+    private void OnOpenKeys(object sender, RoutedEventArgs e)
+        => Open("https://console.groq.com/keys");
+
+    private void OnOpenRepo(object sender, RoutedEventArgs e)
+        => Open("https://github.com/rian2acc/AiLight");
 
     private void OnOpenLog(object sender, RoutedEventArgs e)
     {

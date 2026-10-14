@@ -214,6 +214,30 @@ public static class SelfTest
             }
         });
 
+        Check("Einstellungen: Ecken-Radius und Schrift werden begrenzt", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-anp-").FullName;
+            var file = Path.Combine(folder, "settings.json");
+            try
+            {
+                File.WriteAllText(file, """{"CornerRadius": 99, "FontFamily": "comic"}""");
+                var loaded = AppSettings.Load(file);
+                Equal(22d, loaded.CornerRadius, "Radius begrenzt");
+                Equal("system", loaded.FontFamily, "unbekannte Schrift ersetzt");
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+
+            var fresh = new AppSettings();
+            Equal(16d, fresh.CornerRadius, "Standard-Radius");
+            True(fresh.AnimateBar, "Animationen sind standardmäßig an");
+            True(fresh.ShowMeta, "Fußzeile ist standardmäßig an");
+            True(!fresh.ShowThinking, "Denk-Schritte sind standardmäßig eingeklappt");
+            True(Theme.IsKnownFont(fresh.FontFamily), "Standardschrift ist bekannt");
+        });
+
         Check("Einstellungen: abgeleitete Werte (Tokens, Reasoning)", () =>
         {
             var folder = Directory.CreateTempSubdirectory("ailight-tok-").FullName;
@@ -648,7 +672,12 @@ public static class SelfTest
                 window.SelectAreaForTest("aussehen");
                 window.ApplySliderForTest("WidthSlider", 810);
                 var slider = (Slider)window.FindName("WidthSlider")!;
+
+                // Erst zeigen (der Fensteraufbau braucht das), dann die Seite so
+                // scrollen, dass der Regler wirklich im Bild liegt.
                 Shot.Show(window);
+                slider.BringIntoView();
+                Shot.Settle(window);
 
                 var accent = ((SolidColorBrush)Application.Current.Resources["Brush.Accent"]).Color;
                 var y = slider.ActualHeight / 2;
@@ -717,6 +746,37 @@ public static class SelfTest
             })
             {
                 True(resources.Contains(key), $"Vorlage fehlt: {key}");
+            }
+        });
+
+        Check("Oberfläche: Ecken-Radius und Fußzeilen-Schalter erreichen die Leiste", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-radius-").FullName;
+            try
+            {
+                var settings = new AppSettings { CornerRadius = 20, ShowMeta = false };
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+                bar.ApplySettings();
+
+                var shell = (CornerRadius)Application.Current.Resources["Radius.Shell"];
+                Equal(20d, shell.TopLeft, "Fenster-Radius");
+
+                // Die Fußzeile sitzt unten am Fenster: oben bleibt sie eckig,
+                // unten folgt sie dem Radius (20 - 3).
+                var footer = (Border)bar.FindName("Footer")!;
+                Equal(17d, footer.CornerRadius.BottomRight, "Fußzeile folgt dem Radius");
+                Equal(0d, footer.CornerRadius.TopLeft, "Fußzeile bleibt oben eckig");
+
+                var meta = (TextBlock)bar.FindName("Meta")!;
+                Equal(Visibility.Collapsed, meta.Visibility, "Fußzeile ausgeblendet");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
             }
         });
 

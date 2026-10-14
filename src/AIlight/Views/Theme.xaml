@@ -4,31 +4,35 @@
     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <!--
-      Alles Sichtbare an einer Stelle. Die Farben setzt Theme.Apply() beim Start
-      und bei jeder Änderung; deshalb steht überall DynamicResource — so wirkt
-      ein Wechsel von Hell/Dunkel oder der Akzentfarbe sofort in allen Fenstern.
+      Alles Sichtbare an einer Stelle — angelehnt an macOS: ruhige Flächen,
+      Haarlinien statt kräftiger Rahmen, großzügige Eckenradien, ein Akzent.
+      Die Farben und Radien setzt Theme.Apply() beim Start und bei jeder
+      Änderung; deshalb steht überall DynamicResource — so wirkt ein Wechsel
+      von Hell/Dunkel, Akzentfarbe oder Eckenradius sofort in allen Fenstern.
     -->
 
     <!--  ── Farben (Standardwerte = dunkles Thema) ─────────────────────────  -->
-    <SolidColorBrush x:Key="Brush.Surface" Color="#F01E1F22" />
+    <SolidColorBrush x:Key="Brush.Surface" Color="#F02A2A2C" />
     <SolidColorBrush x:Key="Brush.Border" Color="#33FFFFFF" />
-    <SolidColorBrush x:Key="Brush.Text" Color="#FFE8EAED" />
-    <SolidColorBrush x:Key="Brush.Muted" Color="#FF9AA0A6" />
-    <SolidColorBrush x:Key="Brush.Accent" Color="#FF4C8DFF" />
-    <SolidColorBrush x:Key="Brush.Selection" Color="#334C8DFF" />
-    <SolidColorBrush x:Key="Brush.Code" Color="#59000000" />
+    <SolidColorBrush x:Key="Brush.Text" Color="#FFF5F5F7" />
+    <SolidColorBrush x:Key="Brush.Muted" Color="#FF98989D" />
+    <SolidColorBrush x:Key="Brush.Accent" Color="#FF0A84FF" />
+    <SolidColorBrush x:Key="Brush.Selection" Color="#330A84FF" />
+    <SolidColorBrush x:Key="Brush.Code" Color="#80000000" />
     <SolidColorBrush x:Key="Brush.Shadow" Color="#66000000" />
-    <SolidColorBrush x:Key="Brush.Separator" Color="#1AFFFFFF" />
-    <SolidColorBrush x:Key="Brush.Danger" Color="#FFFF6B6B" />
-    <SolidColorBrush x:Key="Brush.Card" Color="#0DFFFFFF" />
-    <SolidColorBrush x:Key="Brush.CardBorder" Color="#1FFFFFFF" />
-    <SolidColorBrush x:Key="Brush.Hover" Color="#14FFFFFF" />
-    <SolidColorBrush x:Key="Brush.Track" Color="#33FFFFFF" />
-    <SolidColorBrush x:Key="Brush.Field" Color="#59000000" />
-    <SolidColorBrush x:Key="Brush.FieldBorder" Color="#26FFFFFF" />
-    <SolidColorBrush x:Key="Brush.Ring" Color="#594C8DFF" />
+    <SolidColorBrush x:Key="Brush.Separator" Color="#22FFFFFF" />
+    <SolidColorBrush x:Key="Brush.Danger" Color="#FFFF453A" />
+    <SolidColorBrush x:Key="Brush.Card" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="Brush.CardBorder" Color="#26FFFFFF" />
+    <SolidColorBrush x:Key="Brush.Hover" Color="#1AFFFFFF" />
+    <SolidColorBrush x:Key="Brush.Track" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="Brush.Field" Color="#66000000" />
+    <SolidColorBrush x:Key="Brush.FieldBorder" Color="#2EFFFFFF" />
+    <SolidColorBrush x:Key="Brush.Ring" Color="#590A84FF" />
+    <SolidColorBrush x:Key="Brush.Traffic.Red" Color="#FFFF5F57" />
+    <SolidColorBrush x:Key="Brush.Traffic.Yellow" Color="#FEBC2E" />
 
-    <FontFamily x:Key="Font.Ui">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="Font.Ui">Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <!--  ── Schrift ─────────────────────────────────────────────────────────  -->
@@ -76,8 +80,8 @@
         <Setter Property="Background" Value="{DynamicResource Brush.Card}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.CardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
+        <Setter Property="Padding" Value="16,12" />
         <Setter Property="Margin" Value="0,0,0,14" />
     </Style>
 
@@ -89,7 +93,7 @@
 
     <Style x:Key="Panel" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource Brush.Code}" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Field}" />
         <Setter Property="Padding" Value="12,10" />
     </Style>
 
@@ -97,14 +101,14 @@
     <!--  Nur der Schatten; der Inhalt liegt darüber, damit Schrift scharf bleibt.  -->
     <Style x:Key="Chrome.ShadowLayer" TargetType="Border">
         <Setter Property="Background" Value="#01000000" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Shell}" />
         <Setter Property="Effect">
             <Setter.Value>
                 <DropShadowEffect
-                    BlurRadius="18"
+                    BlurRadius="24"
                     Color="#000000"
-                    Opacity="0.45"
-                    ShadowDepth="3" />
+                    Opacity="0.40"
+                    ShadowDepth="4" />
             </Setter.Value>
         </Setter>
     </Style>
@@ -113,31 +117,43 @@
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Shell}" />
     </Style>
 
+    <!--
+      Die „Ampel“ links oben, wie unter macOS: rot schließt, gelb verkleinert.
+      Das Zeichen erscheint erst beim Überfahren; der Kreis dunkelt leicht nach.
+    -->
     <Style x:Key="Chrome.Button" TargetType="Button">
-        <Setter Property="Width" Value="34" />
-        <Setter Property="Height" Value="26" />
-        <Setter Property="Foreground" Value="{DynamicResource Brush.Muted}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Width" Value="13" />
+        <Setter Property="Height" Value="13" />
+        <Setter Property="Margin" Value="0,0,8,0" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Traffic.Yellow}" />
+        <Setter Property="Foreground" Value="#99000000" />
+        <Setter Property="FontSize" Value="8" />
+        <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border
-                        x:Name="Shell"
-                        Background="Transparent"
-                        CornerRadius="6">
+                    <Grid>
+                        <Border
+                            x:Name="Shell"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="#33000000"
+                            BorderThickness="1"
+                            CornerRadius="7" />
                         <ContentPresenter
+                            x:Name="Glyph"
                             HorizontalAlignment="Center"
-                            VerticalAlignment="Center" />
-                    </Border>
+                            VerticalAlignment="Center"
+                            Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shell" Property="Background" Value="{DynamicResource Brush.Hover}" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                            <Setter TargetName="Glyph" Property="Opacity" Value="1" />
+                            <Setter TargetName="Shell" Property="Opacity" Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
@@ -152,11 +168,8 @@
         x:Key="Chrome.Close"
         BasedOn="{StaticResource Chrome.Button}"
         TargetType="Button">
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="White" />
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="Background" Value="{DynamicResource Brush.Traffic.Red}" />
+        <Setter Property="Foreground" Value="#8A0000" />
     </Style>
 
     <!--  ── Knöpfe ──────────────────────────────────────────────────────────  -->
@@ -164,7 +177,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="Padding" Value="13,7" />
         <Setter Property="Margin" Value="0,0,8,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
@@ -175,7 +188,7 @@
                         Background="{DynamicResource Brush.Card}"
                         BorderBrush="{DynamicResource Brush.FieldBorder}"
                         BorderThickness="1"
-                        CornerRadius="8"
+                        CornerRadius="{DynamicResource Radius.Field}"
                         Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -205,7 +218,7 @@
                     <Border
                         x:Name="Shell"
                         Background="{DynamicResource Brush.Accent}"
-                        CornerRadius="8"
+                        CornerRadius="{DynamicResource Radius.Field}"
                         Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -240,7 +253,7 @@
         BasedOn="{StaticResource Button.Ghost}"
         TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Brush.Muted}" />
-        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="Padding" Value="9,3" />
         <Setter Property="Margin" Value="0" />
         <Setter Property="FontSize" Value="12" />
     </Style>
@@ -251,7 +264,7 @@
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="6,1" />
+        <Setter Property="Margin" Value="8,1" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Template">
             <Setter.Value>
@@ -259,7 +272,7 @@
                     <Border
                         x:Name="Shell"
                         Background="Transparent"
-                        CornerRadius="8"
+                        CornerRadius="{DynamicResource Radius.Field}"
                         Padding="10,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -298,10 +311,10 @@
 
     <!--  Ein Eintrag der Vorschlagsliste  -->
     <Style x:Key="Suggest.Row" TargetType="Border">
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Row}" />
         <Setter Property="Padding" Value="10,0" />
         <Setter Property="Margin" Value="8,1" />
-        <Setter Property="Height" Value="38" />
+        <Setter Property="Height" Value="40" />
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
@@ -338,8 +351,8 @@
         <Setter Property="SelectionBrush" Value="{DynamicResource Brush.Accent}" />
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="11,6" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -348,7 +361,7 @@
                         Background="{DynamicResource Brush.Field}"
                         BorderBrush="{DynamicResource Brush.FieldBorder}"
                         BorderThickness="1"
-                        CornerRadius="8">
+                        CornerRadius="{DynamicResource Radius.Field}">
                         <ScrollViewer
                             x:Name="PART_ContentHost"
                             Margin="{TemplateBinding Padding}"
@@ -384,7 +397,7 @@
                         Background="{DynamicResource Brush.Field}"
                         BorderBrush="{DynamicResource Brush.FieldBorder}"
                         BorderThickness="1"
-                        CornerRadius="8">
+                        CornerRadius="{DynamicResource Radius.Field}">
                         <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -404,7 +417,7 @@
         <Setter Property="FontFamily" Value="{DynamicResource Font.Mono}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
-        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Padding" Value="11,6" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
@@ -413,7 +426,7 @@
                         Background="{DynamicResource Brush.Field}"
                         BorderBrush="{DynamicResource Brush.FieldBorder}"
                         BorderThickness="1"
-                        CornerRadius="8">
+                        CornerRadius="{DynamicResource Radius.Field}">
                         <ScrollViewer
                             x:Name="PART_ContentHost"
                             Margin="{TemplateBinding Padding}"
@@ -484,7 +497,7 @@
                                         Background="{DynamicResource Brush.Field}"
                                         BorderBrush="{DynamicResource Brush.FieldBorder}"
                                         BorderThickness="1"
-                                        CornerRadius="8">
+                                        CornerRadius="{DynamicResource Radius.Field}">
                                         <TextBlock
                                             Margin="0,0,12,0"
                                             HorizontalAlignment="Right"
@@ -505,7 +518,7 @@
                             </ToggleButton.Template>
                         </ToggleButton>
                         <ContentPresenter
-                            Margin="10,0,30,0"
+                            Margin="11,0,30,0"
                             VerticalAlignment="Center"
                             Content="{TemplateBinding SelectionBoxItem}"
                             ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
@@ -525,13 +538,13 @@
                                 Background="{DynamicResource Brush.Surface}"
                                 BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="1"
-                                CornerRadius="10">
+                                CornerRadius="{DynamicResource Radius.Card}">
                                 <Border.Effect>
                                     <DropShadowEffect
-                                        BlurRadius="14"
+                                        BlurRadius="16"
                                         Color="#000000"
-                                        Opacity="0.35"
-                                        ShadowDepth="2" />
+                                        Opacity="0.32"
+                                        ShadowDepth="3" />
                                 </Border.Effect>
                                 <ScrollViewer Margin="4,6" VerticalScrollBarVisibility="Auto">
                                     <ItemsPresenter />
@@ -560,23 +573,23 @@
                         </Grid.ColumnDefinitions>
                         <Border
                             x:Name="Track"
-                            Width="36"
-                            Height="20"
+                            Width="38"
+                            Height="22"
                             VerticalAlignment="Center"
                             Background="{DynamicResource Brush.Track}"
-                            CornerRadius="10">
+                            CornerRadius="11">
                             <Border
                                 x:Name="Knob"
-                                Width="14"
-                                Height="14"
+                                Width="16"
+                                Height="16"
                                 Margin="3,0,0,0"
                                 HorizontalAlignment="Left"
                                 Background="{DynamicResource Brush.Muted}"
-                                CornerRadius="7" />
+                                CornerRadius="8" />
                         </Border>
                         <ContentPresenter
                             Grid.Column="1"
-                            Margin="10,0,0,0"
+                            Margin="11,0,0,0"
                             VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -600,9 +613,9 @@
 
     <!--  Farbfeld für die Akzentfarbe  -->
     <Style x:Key="Swatch" TargetType="ToggleButton">
-        <Setter Property="Width" Value="34" />
-        <Setter Property="Height" Value="34" />
-        <Setter Property="Margin" Value="0,0,10,0" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Margin" Value="0,0,9,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -613,7 +626,7 @@
                             Background="Transparent"
                             BorderBrush="Transparent"
                             BorderThickness="2"
-                            CornerRadius="11" />
+                            CornerRadius="10" />
                         <Border
                             x:Name="Face"
                             Margin="3"

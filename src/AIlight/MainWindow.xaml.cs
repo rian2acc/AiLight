@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AIlight.Core;
 using AIlight.Groq;
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cancel;
     private DispatcherTimer? _paint;
     private DispatcherTimer? _hideLater;
+    private bool _thinkingAutoExpanded;
     private string _lastQuestion = "";
     private AskResult? _lastResult;
     private bool _streaming;
@@ -214,10 +216,16 @@ public partial class MainWindow : Window
     /// <summary>Einstellungen anwenden (Breite, Schrift, Farben, Höhen).</summary>
     public void ApplySettings()
     {
-        Theme.Apply(_settings.Theme, _settings.Accent, _settings.Opacity);
+        Theme.Apply(_settings.Theme, _settings.Accent, _settings.Opacity,
+            _settings.CornerRadius, _settings.FontFamily);
         Width = _settings.WindowWidth;
         Input.FontSize = _settings.FontSize;
         Placeholder.FontSize = _settings.FontSize;
+
+        // Die Fußzeile schließt unten mit demselben Radius ab wie das Fenster.
+        var shell = Math.Clamp(_settings.CornerRadius, 8, 22);
+        Footer.CornerRadius = new CornerRadius(0, 0, Math.Max(0, shell - 3), Math.Max(0, shell - 3));
+        Meta.Visibility = _settings.ShowMeta ? Visibility.Visible : Visibility.Collapsed;
 
         var working = WorkingAreaDip();
         MaxHeight = Math.Max(320, working.Height - 60);
@@ -263,6 +271,8 @@ public partial class MainWindow : Window
         _previousWindow = GetForegroundWindow();
         Show();
         PlaceWindow();
+        // Leicht einblenden, wie ein Spotlight — abschaltbar über die Einstellungen.
+        StartBarAnimation();
         Activate();
         Input.SelectAll();
         Input.Focus();
@@ -292,6 +302,25 @@ public partial class MainWindow : Window
         SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
+    /// <summary>Kurzes Einblenden (oder sofort, wenn Animationen ausgeschaltet sind).</summary>
+    private void StartBarAnimation()
+    {
+        if (!_settings.AnimateBar)
+        {
+            BeginAnimation(OpacityProperty, null);
+            Opacity = 1;
+            return;
+        }
+
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 0;
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+        };
+        BeginAnimation(OpacityProperty, fade);
+    }
+
     public void HideBar()
     {
         if (!IsVisible)
@@ -299,6 +328,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 1;
         Hide();
         if (_previousWindow != IntPtr.Zero && _previousWindow != new WindowInteropHelper(this).Handle)
         {
@@ -404,7 +435,13 @@ public partial class MainWindow : Window
                 return;
 
             case Key.C when control:
-                if (!string.IsNullOrEmpty(Input.SelectedText) || _answer.Length == 0)
+                bool hasAnswer;
+                lock (_answer)
+                {
+                    hasAnswer = _answer.Length > 0;
+                }
+
+                if (!string.IsNullOrEmpty(Input.SelectedText) || !hasAnswer)
                 {
                     return; // normales Kopieren im Eingabefeld
                 }
@@ -666,10 +703,20 @@ public partial class MainWindow : Window
     {
         _chat.NewChat();
         Input.Clear();
-        _answer.Clear();
-        _thinking.Clear();
+        lock (_answer)
+        {
+            _answer.Clear();
+        }
+
+        lock (_thinking)
+        {
+            _thinking.Clear();
+        }
+
         _lastResult = null;
         _lastQuestion = "";
+        _thinkingAutoExpanded = false;
+        StopSpinner();
         AnswerBox.Visibility = Visibility.Collapsed;
         ThinkingBox.Visibility = Visibility.Collapsed;
         Meta.Text = "";
@@ -826,7 +873,9 @@ public partial class MainWindow : Window
         AnswerPanel.Children.Clear();
         AnswerBox.Visibility = Visibility.Visible;
         Spinner.Visibility = Visibility.Visible;
+        StartSpinner();
         StopButton.Visibility = Visibility.Visible;
+        _thinkingAutoExpanded = false;
         SetHint("Anfrage läuft — Esc bricht ab.");
         Meta.Text = display;
 
@@ -882,6 +931,7 @@ public partial class MainWindow : Window
             _streaming = false;
             StopPaintTimer();
             FlushAnswer();
+            StopSpinner();
             Spinner.Visibility = Visibility.Collapsed;
             StopButton.Visibility = Visibility.Collapsed;
 
@@ -968,6 +1018,27 @@ public partial class MainWindow : Window
 
     private void StopPaintTimer() => _paint?.Stop();
 
+    /// <summary>Der kleine Punkt atmet, solange eine Antwort läuft.</summary>
+    private void StartSpinner()
+    {
+        var pulse = new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(560))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+        };
+        Spinner.Opacity = 1;
+        if (_settings.AnimateBar)
+        {
+            Spinner.BeginAnimation(UIElement.OpacityProperty, pulse);
+        }
+    }
+
+    private void StopSpinner()
+    {
+        Spinner.BeginAnimation(UIElement.OpacityProperty, null);
+        Spinner.Opacity = 1;
+    }
+
     private void OnPaintTick(object? sender, EventArgs e)
     {
         FlushAnswer();
@@ -1001,6 +1072,15 @@ public partial class MainWindow : Window
         {
             ThinkingBox.Visibility = Visibility.Visible;
             ThinkingText.Text = thinking.Trim();
+
+            // Nur einmal je Frage automatisch aufklappen — danach gehört die
+            // Entscheidung dem Nutzer (sonst würde jeder Zeichentakt sie öffnen).
+            if (_settings.ShowThinking && !_thinkingAutoExpanded)
+            {
+                _thinkingAutoExpanded = true;
+                ThinkingText.Visibility = Visibility.Visible;
+                ThinkingHeader.Text = "▾ Denk-Schritte verbergen";
+            }
         }
 
         if (atBottom)
@@ -1011,8 +1091,12 @@ public partial class MainWindow : Window
 
     private void ShowAnswer(string question, string answer, AskResult result)
     {
-        _answer.Clear();
-        _answer.Append(answer);
+        lock (_answer)
+        {
+            _answer.Clear();
+            _answer.Append(answer);
+        }
+
         _lastQuestion = question;
         _lastResult = result;
         AnswerBox.Visibility = Visibility.Visible;
@@ -1023,8 +1107,12 @@ public partial class MainWindow : Window
 
     private void ShowText(string title, string markdown)
     {
-        _answer.Clear();
-        _answer.Append($"## {title}\n\n{markdown}");
+        lock (_answer)
+        {
+            _answer.Clear();
+            _answer.Append($"## {title}\n\n{markdown}");
+        }
+
         _lastResult = null;
         AnswerBox.Visibility = Visibility.Visible;
         FlushAnswer();
@@ -1062,13 +1150,19 @@ public partial class MainWindow : Window
 
     private void CopyAnswer()
     {
-        if (_answer.Length == 0)
+        string text;
+        lock (_answer)
+        {
+            text = _answer.ToString();
+        }
+
+        if (text.Length == 0)
         {
             SetHint("Es gibt noch keine Antwort zum Kopieren.");
             return;
         }
 
-        if (WriteClipboard(_answer.ToString()))
+        if (WriteClipboard(text))
         {
             SetHint("Antwort in der Zwischenablage.");
         }
@@ -1076,7 +1170,13 @@ public partial class MainWindow : Window
 
     private void SaveAnswer()
     {
-        if (_answer.Length == 0)
+        string text;
+        lock (_answer)
+        {
+            text = _answer.ToString();
+        }
+
+        if (text.Length == 0)
         {
             SetHint("Es gibt noch keine Antwort zum Speichern.");
             return;
@@ -1088,7 +1188,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(folder);
             var name = $"AIlight {DateTime.Now:yyyy-MM-dd HH-mm-ss}.md";
             var path = Path.Combine(folder, name);
-            var body = $"# {_lastQuestion}\n\n{_answer}\n";
+            var body = $"# {_lastQuestion}\n\n{text}\n";
             if (Meta.Text.Length > 0)
             {
                 body += $"\n---\n{_lastQuestion.Length} Zeichen Frage · {Meta.Text}\n";

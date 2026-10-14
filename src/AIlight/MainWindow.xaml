@@ -27,22 +27,31 @@
             <StackPanel>
 
                 <!--  ── Eingabezeile  ───────────────────────────────────────  -->
-                <Grid Height="56">
+                <Grid Height="58">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="48" />
+                        <ColumnDefinition Width="52" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock
-                        x:Name="Brand"
+                    <!--  Wie ein „Spotlight“-Zeichen: kleiner Chip in der Akzentfarbe.  -->
+                    <Border
+                        x:Name="BrandChip"
                         Grid.Column="0"
-                        Margin="4,0,0,0"
+                        Width="34"
+                        Height="34"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        FontSize="19"
-                        Foreground="{DynamicResource Brush.Accent}"
-                        Text="✦" />
+                        Background="{DynamicResource Brush.Selection}"
+                        CornerRadius="{DynamicResource Radius.Field}">
+                        <TextBlock
+                            x:Name="Brand"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="17"
+                            Foreground="{DynamicResource Brush.Accent}"
+                            Text="✦" />
+                    </Border>
 
                     <Grid Grid.Column="1" VerticalAlignment="Center">
                         <TextBox
@@ -69,7 +78,7 @@
 
                     <StackPanel
                         Grid.Column="2"
-                        Margin="8,0,12,0"
+                        Margin="8,0,14,0"
                         VerticalAlignment="Center"
                         Orientation="Horizontal">
                         <TextBlock
@@ -82,7 +91,7 @@
                         <Button
                             x:Name="StopButton"
                             Click="OnStopClicked"
-                            Content="Stop"
+                            Content="Stopp"
                             Style="{StaticResource Bar.Button}"
                             Visibility="Collapsed" />
                     </StackPanel>
@@ -105,8 +114,8 @@
                 <!--  ── Vorschläge  ─────────────────────────────────────────  -->
                 <ScrollViewer
                     x:Name="SuggestionScroll"
-                    MaxHeight="304"
-                    Margin="0,2,0,4"
+                    MaxHeight="312"
+                    Margin="0,3,0,5"
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="SuggestionList">
@@ -157,9 +166,14 @@
                                     <DataTrigger Binding="{Binding ShowSeparator}" Value="True">
                                         <Setter TargetName="Divider" Property="Visibility" Value="Visible" />
                                     </DataTrigger>
+                                    <!--  Zeile unter dem Mauszeiger: leichte Aufhellung wie in einer macOS-Liste.  -->
+                                    <Trigger SourceName="RowShell" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Hover}" />
+                                    </Trigger>
                                     <DataTrigger Binding="{Binding IsAsk}" Value="True">
                                         <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
                                     </DataTrigger>
+                                    <!--  Die Auswahl gewinnt immer (steht bewusst nach dem Hover).  -->
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                         <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Selection}" />
                                         <Setter TargetName="Mark" Property="Background" Value="{DynamicResource Brush.Accent}" />
@@ -174,10 +188,10 @@
                 <!--  Denk-Schritte (eingeklappt, nur wenn vorhanden)  -->
                 <Border
                     x:Name="ThinkingBox"
-                    Margin="12,2,12,6"
-                    Padding="10,6"
+                    Margin="12,3,12,7"
+                    Padding="12,7"
                     Background="{DynamicResource Brush.Code}"
-                    CornerRadius="8"
+                    CornerRadius="{DynamicResource Radius.Field}"
                     Visibility="Collapsed">
                     <StackPanel>
                         <TextBlock
@@ -189,7 +203,7 @@
                             Text="▸ Denk-Schritte anzeigen" />
                         <TextBlock
                             x:Name="ThinkingText"
-                            Margin="0,4,0,0"
+                            Margin="0,5,0,0"
                             FontSize="12"
                             Foreground="{DynamicResource Brush.Muted}"
                             TextWrapping="Wrap"
@@ -207,15 +221,15 @@
                         HorizontalScrollBarVisibility="Disabled"
                         Padding="0"
                         VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="AnswerPanel" Margin="16,2,16,8" />
+                        <StackPanel x:Name="AnswerPanel" Margin="18,4,18,10" />
                     </ScrollViewer>
                 </Border>
 
                 <!--  ── Fußzeile  ───────────────────────────────────────────  -->
                 <Border
                     x:Name="Footer"
-                    Height="26"
-                    Padding="14,0"
+                    Height="27"
+                    Padding="16,0"
                     Background="{DynamicResource Brush.Code}"
                     CornerRadius="0,0,13,13">
                     <Grid>

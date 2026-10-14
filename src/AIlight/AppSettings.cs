@@ -31,11 +31,16 @@ public sealed class AppSettings : INotifyPropertyChanged
 
     // ── Aussehen ─────────────────────────────────────────────────────────────
     private string _theme = "system";
-    private string _accent = "#4C8DFF";
+    private string _accent = Views.Theme.DefaultAccent;
     private double _windowWidth = 680;
     private double _topPercent = 14;
     private double _fontSize = 16;
     private double _opacity = 0.98;
+    private double _cornerRadius = 16;
+    private string _fontFamily = "system";
+    private bool _animateBar = true;
+    private bool _showThinking;
+    private bool _showMeta = true;
 
     // ── Verlauf ──────────────────────────────────────────────────────────────
     private int _maxSuggestions = 6;
@@ -85,6 +90,11 @@ public sealed class AppSettings : INotifyPropertyChanged
     public double TopPercent { get => _topPercent; set => Set(ref _topPercent, value); }
     public double FontSize { get => _fontSize; set => Set(ref _fontSize, value); }
     public double Opacity { get => _opacity; set => Set(ref _opacity, value); }
+    public double CornerRadius { get => _cornerRadius; set => Set(ref _cornerRadius, value); }
+    public string FontFamily { get => _fontFamily; set => Set(ref _fontFamily, value); }
+    public bool AnimateBar { get => _animateBar; set => Set(ref _animateBar, value); }
+    public bool ShowThinking { get => _showThinking; set => Set(ref _showThinking, value); }
+    public bool ShowMeta { get => _showMeta; set => Set(ref _showMeta, value); }
 
     public int MaxSuggestions { get => _maxSuggestions; set => Set(ref _maxSuggestions, value); }
     public int KeepHistoryDays { get => _keepHistoryDays; set => Set(ref _keepHistoryDays, value); }
@@ -170,6 +180,11 @@ public sealed class AppSettings : INotifyPropertyChanged
         _topPercent = Math.Clamp(_topPercent, 0, 60);
         _fontSize = Math.Clamp(_fontSize, 12, 28);
         _opacity = Math.Clamp(_opacity, 0.6, 1.0);
+        _cornerRadius = Math.Clamp(_cornerRadius, 8, 22);
+        if (_fontFamily is not ("system" or "segoe" or "calibri" or "arial"))
+        {
+            _fontFamily = "system";
+        }
         _maxSuggestions = Math.Clamp(_maxSuggestions, 0, 12);
         _memoryRounds = Math.Clamp(_memoryRounds, 0, 20);
         _keepHistoryDays = Math.Clamp(_keepHistoryDays, 0, 3650);
@@ -185,7 +200,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            File.WriteAllText(file, JsonSerializer.Serialize(this, Json));
+            AtomicFile.WriteAllText(file, JsonSerializer.Serialize(this, Json));
         }
         catch (Exception ex)
         {

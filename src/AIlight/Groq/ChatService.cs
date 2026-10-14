@@ -185,7 +185,7 @@ public sealed class ChatService
         try
         {
             var payload = new ConversationFile(_rounds.ToList());
-            File.WriteAllText(_conversationPath, JsonSerializer.Serialize(payload));
+            AtomicFile.WriteAllText(_conversationPath, JsonSerializer.Serialize(payload));
         }
         catch (Exception ex)
         {

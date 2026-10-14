@@ -97,7 +97,7 @@ public sealed class App : Application
         Log.Info($"AIlight startet (Version {GetType().Assembly.GetName().Version}, {_options.Summary})");
         Trace("einstellungen");
 
-        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity);
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
 
         _client = new GroqClient();
         History = new HistoryStore(Paths.HistoryFile);
@@ -288,7 +288,10 @@ public sealed class App : Application
             case nameof(AppSettings.Theme):
             case nameof(AppSettings.Accent):
             case nameof(AppSettings.Opacity):
-                Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity);
+            case nameof(AppSettings.CornerRadius):
+            case nameof(AppSettings.FontFamily):
+                Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity,
+                    Settings.CornerRadius, Settings.FontFamily);
                 _bar?.ApplySettings();
                 break;
 
@@ -296,6 +299,9 @@ public sealed class App : Application
             case nameof(AppSettings.TopPercent):
             case nameof(AppSettings.FontSize):
             case nameof(AppSettings.MaxSuggestions):
+            case nameof(AppSettings.AnimateBar):
+            case nameof(AppSettings.ShowThinking):
+            case nameof(AppSettings.ShowMeta):
                 _bar?.ApplySettings();
                 break;
 
@@ -584,7 +590,7 @@ public sealed class App : Application
             SaveSettingsShot(folder, "hell", area);
         }
 
-        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity);
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
 
         SaveBarShot(folder, "leiste-vorschlaege.png", "", "", "");
         SaveBarShot(

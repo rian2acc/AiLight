@@ -5,8 +5,9 @@ using Color = System.Windows.Media.Color;
 namespace AIlight.Views;
 
 /// <summary>
-/// Setzt die Farben zur Laufzeit. Alle Fenster benutzen <c>DynamicResource</c>,
-/// dadurch wirkt eine Änderung (Hell/Dunkel, Akzentfarbe) sofort überall.
+/// Setzt die Farben, Eckenradien und die Schrift zur Laufzeit. Alle Fenster
+/// benutzen <c>DynamicResource</c>, dadurch wirkt eine Änderung (Hell/Dunkel,
+/// Akzentfarbe, Radius, Schrift) sofort überall.
 /// </summary>
 public static class Theme
 {
@@ -29,35 +30,40 @@ public static class Theme
         string FieldBorder,
         string Separator);
 
+    /// <summary>Ruheflächen im macOS-Dunkel: Fenster, Karten, Eingaben klar getrennt.</summary>
     private static readonly Palette Dark = new(
-        Surface: "#F01E1F22",
-        Card: "#0DFFFFFF",
-        CardBorder: "#1FFFFFFF",
+        Surface: "#F02A2A2C",
+        Card: "#14FFFFFF",
+        CardBorder: "#26FFFFFF",
         Border: "#33FFFFFF",
-        Hover: "#14FFFFFF",
-        Text: "#FFE8EAED",
-        Muted: "#FF9AA0A6",
+        Hover: "#1AFFFFFF",
+        Text: "#F5F5F7",
+        Muted: "#98989D",
         Selection: "#33FFFFFF",
-        Code: "#59000000",
-        Track: "#33FFFFFF",
-        Field: "#59000000",
-        FieldBorder: "#26FFFFFF",
-        Separator: "#1AFFFFFF");
+        Code: "#80000000",
+        Track: "#40FFFFFF",
+        Field: "#66000000",
+        FieldBorder: "#2EFFFFFF",
+        Separator: "#22FFFFFF");
 
+    /// <summary>Helles Fenster (#F2F2F7) mit weißen Karten und Haarlinien.</summary>
     private static readonly Palette Light = new(
-        Surface: "#F5F3F3F3",
+        Surface: "#F0F2F2F7",
         Card: "#FFFFFFFF",
-        CardBorder: "#1A000000",
+        CardBorder: "#1F000000",
         Border: "#22000000",
-        Hover: "#0F000000",
-        Text: "#FF1F1F1F",
-        Muted: "#FF5F6368",
+        Hover: "#0A000000",
+        Text: "#FF1D1D1F",
+        Muted: "#FF6E6E73",
         Selection: "#22000000",
-        Code: "#08000000",
+        Code: "#0D000000",
         Track: "#33000000",
         Field: "#FFFFFFFF",
-        FieldBorder: "#22000000",
-        Separator: "#14000000");
+        FieldBorder: "#33000000",
+        Separator: "#1F000000");
+
+    /// <summary>Der Standardakzent: das Blau von macOS.</summary>
+    public const string DefaultAccent = "#0A84FF";
 
     /// <summary>Wirklich benutzter Modus („system“ wird zu Hell oder Dunkel aufgelöst).</summary>
     public static bool IsDarkMode(string setting)
@@ -89,12 +95,28 @@ public static class Theme
         }
     }
 
-    public static void Apply(string themeSetting, string accentHex, double opacity)
+    /// <summary>
+    /// Schriftauswahl aus den Einstellungen. Immer ein sinnvoller Rückfall:
+    /// die Systemschrift ist auf Windows 11 „Segoe UI Variable“.
+    /// </summary>
+    public static FontFamily FontStack(string key) => key switch
+    {
+        "segoe" => new FontFamily("Segoe UI"),
+        "calibri" => new FontFamily("Calibri"),
+        "arial" => new FontFamily("Arial"),
+        _ => new FontFamily("Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI"),
+    };
+
+    public static bool IsKnownFont(string key)
+        => key is "system" or "segoe" or "calibri" or "arial";
+
+    public static void Apply(string themeSetting, string accentHex, double opacity,
+        double radius = 16, string font = "system")
     {
         var dark = IsDarkMode(themeSetting);
         var palette = dark ? Dark : Light;
         var resources = Application.Current.Resources;
-        var accent = Parse(accentHex) ?? Color.FromRgb(0x4C, 0x8D, 0xFF);
+        var accent = Parse(accentHex) ?? Parse(DefaultAccent) ?? Color.FromRgb(0x0A, 0x84, 0xFF);
 
         Set(resources, "Brush.Surface", WithOpacity(palette.Surface, opacity));
         Set(resources, "Brush.Card", Parse(palette.Card) ?? Colors.Transparent);
@@ -103,7 +125,7 @@ public static class Theme
         Set(resources, "Brush.Hover", Parse(palette.Hover) ?? Colors.Transparent);
         Set(resources, "Brush.Text", Parse(palette.Text) ?? Colors.White);
         Set(resources, "Brush.Muted", Parse(palette.Muted) ?? Colors.Gray);
-        Set(resources, "Brush.Selection", Blend(accent, dark ? 0.20 : 0.14));
+        Set(resources, "Brush.Selection", Blend(accent, dark ? 0.22 : 0.16));
         Set(resources, "Brush.Code", Parse(palette.Code) ?? Colors.Transparent);
         Set(resources, "Brush.Track", Parse(palette.Track) ?? Colors.Transparent);
         Set(resources, "Brush.Field", Parse(palette.Field) ?? Colors.Transparent);
@@ -112,8 +134,25 @@ public static class Theme
         Set(resources, "Brush.Ring", Blend(accent, 0.35));
 
         Set(resources, "Brush.Accent", accent);
-        Set(resources, "Brush.Danger", Color.FromRgb(0xFF, 0x6B, 0x6B));
+        Set(resources, "Brush.Danger", Color.FromRgb(0xFF, 0x45, 0x3A));
         Set(resources, "Brush.Shadow", dark ? Color.FromArgb(0x66, 0, 0, 0) : Color.FromArgb(0x33, 0, 0, 0));
+
+        ApplyRadius(resources, radius);
+        resources["Font.Ui"] = FontStack(font);
+    }
+
+    /// <summary>
+    /// Eckenradien aus einem Wert ableiten: das Fenster bekommt den vollen
+    /// Radius, Karten, Felder und Zeilen etwas weniger — so wirkt alles wie aus
+    /// einem Guss (dieselbe Staffelung benutzt macOS).
+    /// </summary>
+    public static void ApplyRadius(ResourceDictionary resources, double radius)
+    {
+        var r = Math.Clamp(radius, 8, 22);
+        resources["Radius.Shell"] = new CornerRadius(r);
+        resources["Radius.Card"] = new CornerRadius(Math.Max(6, r - 4));
+        resources["Radius.Field"] = new CornerRadius(Math.Max(5, r - 6));
+        resources["Radius.Row"] = new CornerRadius(Math.Max(6, r - 5));
     }
 
     private static void Set(ResourceDictionary resources, string key, Color color)
@@ -126,7 +165,7 @@ public static class Theme
     /// <summary>Farbe aus <c>#AARRGGBB</c>/<c>#RRGGBB</c>; die Deckkraft-Einstellung ersetzt Alpha.</summary>
     private static Color WithOpacity(string hex, double opacity)
     {
-        var color = Parse(hex) ?? Color.FromRgb(0x1E, 0x1F, 0x22);
+        var color = Parse(hex) ?? Color.FromRgb(0x2A, 0x2A, 0x2C);
         if (opacity >= 1.0)
         {
             return color;

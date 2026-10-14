@@ -33,7 +33,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build src/AIlight/AIlight.csproj -c Release --no-restore
 
-      - name: Run Self-Test (41 assertions)
+      - name: Run Self-Test (43 assertions)
         run: |
           dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish -p:PublishSingleFile=true -p:PublishTrimmed=true --self-contained true -r win-x64
           cd dist/publish

@@ -171,7 +171,7 @@ public sealed class HistoryStore
         try
         {
             var text = string.Concat(entries.Select(e => JsonSerializer.Serialize(e, Json) + Environment.NewLine));
-            File.WriteAllText(Path_, text, Encoding.UTF8);
+            AtomicFile.WriteAllText(Path_, text, Encoding.UTF8);
         }
         catch (Exception ex)
         {

@@ -33,21 +33,41 @@
                 <!--  ── Titelzeile  ────────────────────────────────────────  -->
                 <Grid Grid.Row="0" MouseLeftButtonDown="OnTitleBarMouseDown">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
+                    <!--  Die Ampel links oben, wie unter macOS: rot schließt, gelb verkleinert.  -->
                     <StackPanel
-                        Margin="20,0,0,0"
+                        Grid.Column="0"
+                        Margin="17,0,0,0"
                         VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <Button
+                            Click="OnCloseSettings"
+                            Content="✕"
+                            Style="{StaticResource Chrome.Close}"
+                            ToolTip="Schließen (Esc)" />
+                        <Button
+                            Click="OnMinimize"
+                            Content="–"
+                            Style="{StaticResource Chrome.Button}"
+                            ToolTip="Verkleinern" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="1"
+                        Margin="15,0,0,0"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False"
                         Orientation="Horizontal">
                         <TextBlock
                             VerticalAlignment="Center"
-                            FontSize="16"
+                            FontSize="15"
                             Foreground="{DynamicResource Brush.Accent}"
                             Text="✦" />
                         <TextBlock
-                            Margin="10,0,0,0"
+                            Margin="8,0,0,0"
                             VerticalAlignment="Center"
                             Style="{StaticResource Title}"
                             Text="AIlight" />
@@ -56,23 +76,6 @@
                             VerticalAlignment="Center"
                             Style="{StaticResource Caption}"
                             Text="Einstellungen" />
-                    </StackPanel>
-
-                    <StackPanel
-                        Grid.Column="1"
-                        Margin="0,0,12,0"
-                        VerticalAlignment="Center"
-                        Orientation="Horizontal">
-                        <Button
-                            Click="OnMinimize"
-                            Content="—"
-                            Style="{StaticResource Chrome.Button}"
-                            ToolTip="Verkleinern" />
-                        <Button
-                            Click="OnCloseSettings"
-                            Content="✕"
-                            Style="{StaticResource Chrome.Close}"
-                            ToolTip="Schließen (Esc)" />
                     </StackPanel>
                 </Grid>
 
@@ -85,6 +88,7 @@
 
                     <Border
                         Grid.Column="0"
+                        Background="{DynamicResource Brush.Card}"
                         BorderBrush="{DynamicResource Brush.Separator}"
                         BorderThickness="0,1,1,0">
                         <DockPanel Margin="8,10,8,10">
@@ -179,6 +183,10 @@
                                                 x:Name="TestKeyButton"
                                                 Click="OnTestKey"
                                                 Content="Schlüssel testen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                            <Button
+                                                Click="OnOpenKeys"
+                                                Content="Schlüssel erstellen"
                                                 Style="{StaticResource Button.Ghost}" />
                                             <Button
                                                 Click="OnDeleteKey"
@@ -524,6 +532,77 @@
 
                                 <Border Style="{StaticResource Card}">
                                     <StackPanel>
+                                        <TextBlock
+                                            Margin="0,2,0,10"
+                                            Style="{StaticResource Title}"
+                                            Text="Form und Schrift" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Ecken-Radius" />
+                                            <Slider
+                                                x:Name="CornerSlider"
+                                                Grid.Column="1"
+                                                Maximum="22"
+                                                Minimum="8"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="CornerValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Schrift" />
+                                            <ComboBox
+                                                x:Name="FontBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock
+                                            Margin="0,2,0,10"
+                                            Style="{StaticResource Title}"
+                                            Text="Bewegung und Antwort" />
+                                        <CheckBox
+                                            x:Name="AnimateCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Leiste einblenden und Impuls animieren"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="ThinkingCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Denk-Schritte automatisch aufklappen"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="MetaCheck"
+                                            Checked="OnControlChanged"
+                                            Content="Fußzeile mit Modell, Tokens und Kosten zeigen"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="164" />
@@ -679,6 +758,10 @@
                                             Text="" />
                                         <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
                                         <WrapPanel>
+                                            <Button
+                                                Click="OnOpenRepo"
+                                                Content="Projekt auf GitHub"
+                                                Style="{StaticResource Button.Ghost}" />
                                             <Button
                                                 Click="OnOpenDataFolder"
                                                 Content="Einstellungsordner"

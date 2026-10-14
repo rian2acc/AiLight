@@ -77,7 +77,10 @@ public sealed class GroqClient : IDisposable
         {
             attempt++;
             token.ThrowIfCancellationRequested();
-            var sentAnyText = false;
+            // Wahr, sobald auch nur ein Stück (Text oder Denk-Schritte) an die
+            // Oberfläche übergeben wurde — dann darf nicht neu gestartet werden,
+            // sonst stünde der Antwortanfang doppelt im Bild.
+            var delivered = false;
             var finishReason = "";
             var usageIn = 0;
             var usageOut = 0;
@@ -98,7 +101,7 @@ public sealed class GroqClient : IDisposable
                 {
                     var body = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
                     var retryDelay = RetryDelay(response, attempt);
-                    if (retryDelay is { } delay && !sentAnyText)
+                    if (retryDelay is { } delay && !delivered)
                     {
                         Log.Warn($"Groq antwortete {(int)response.StatusCode} — neuer Versuch in {delay.TotalSeconds:0.0} s");
                         await Task.Delay(delay, token).ConfigureAwait(false);
@@ -136,7 +139,7 @@ public sealed class GroqClient : IDisposable
                     }
 
                     ReadChunk(data, text, reasoning, onText, onReasoning, ref finishReason,
-                        ref usageIn, ref usageOut, ref sentAnyText);
+                        ref usageIn, ref usageOut, ref delivered);
                 }
 
                 started.Stop();
@@ -150,6 +153,17 @@ public sealed class GroqClient : IDisposable
             }
             catch (HttpRequestException ex)
             {
+                if (delivered)
+                {
+                    // Die Verbindung ist mitten in der Antwort abgerissen. Ein
+                    // Neustart würde Fragmente verdoppeln — deshalb bleibt der
+                    // bisherige Text stehen und der Nutzer fragt neu (Enter).
+                    started.Stop();
+                    throw new GroqException(
+                        "Die Verbindung zu Groq ist mitten in der Antwort abgerissen — "
+                        + "der bisherige Text bleibt stehen. Enter fragt erneut.", retryable: true, ex);
+                }
+
                 if (attempt < MaxAttempts)
                 {
                     var delay = TimeSpan.FromSeconds(Math.Min(10, 1.5 * attempt));
@@ -189,7 +203,7 @@ public sealed class GroqClient : IDisposable
     private static void ReadChunk(
         string data, StringBuilder text, StringBuilder reasoning,
         Action<string> onText, Action<string>? onReasoning,
-        ref string finishReason, ref int usageIn, ref int usageOut, ref bool sentAnyText)
+        ref string finishReason, ref int usageIn, ref int usageOut, ref bool delivered)
     {
         try
         {
@@ -224,6 +238,7 @@ public sealed class GroqClient : IDisposable
                 if (piece.Length > 0)
                 {
                     reasoning.Append(piece);
+                    delivered = true;
                     onReasoning?.Invoke(piece);
                 }
             }
@@ -233,7 +248,7 @@ public sealed class GroqClient : IDisposable
                 foreach (var piece in ThinkSplitter.Split(content.GetString() ?? "", reasoning))
                 {
                     text.Append(piece);
-                    sentAnyText = true;
+                    delivered = true;
                     onText(piece);
                 }
             }
