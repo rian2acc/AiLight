@@ -742,6 +742,7 @@ public static class SelfTest
                 "Nav.Item", "Button.Primary", "Button.Ghost", "Button.Danger", "Bar.Button",
                 "Field.Text", "Field.Multiline", "Field.Secret", "Box.Select", "Box.Item",
                 "Switch", "Swatch", "Slider.Slim", "Suggest.Row", "Suggest.Subtitle",
+                "Icon.Beam", "Radius.Shell", "Radius.Card", "Radius.Field", "Radius.Row",
                 "Brush.Card", "Brush.Hover", "Brush.Track", "Brush.Field", "Brush.Ring",
             })
             {

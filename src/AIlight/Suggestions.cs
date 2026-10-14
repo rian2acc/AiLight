@@ -23,7 +23,7 @@ public sealed record Suggestion(string Glyph, string Title, string Subtitle, Sug
     public static Suggestion ForQuestion(string question, string modelLabel)
     {
         var title = question.Length > 70 ? question[..70] + "…" : question;
-        return new Suggestion("✦", $"Fragen: „{title}“", modelLabel, SuggestionKind.Ask, question);
+        return new Suggestion("↵", $"Fragen: „{title}“", modelLabel, SuggestionKind.Ask, question);
     }
 
     public static Suggestion ForHistory(HistoryEntry entry)

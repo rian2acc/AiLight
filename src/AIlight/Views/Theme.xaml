@@ -35,6 +35,16 @@
     <FontFamily x:Key="Font.Ui">Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="Font.Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
 
+    <!--
+      Die Marke als Vektorgrafik: ein Lichtstrahl, der aus einem Punkt nach oben
+      aufgeht. Dieselbe Form wie im Programmsymbol (tools/make_icon.py) — bewusst
+      kein vierstrahliges „Funkeln“, sondern das Bild von AIlight selbst.
+    -->
+    <GeometryGroup x:Key="Icon.Beam" FillRule="Nonzero">
+        <PathGeometry Figures="M 29,14 L 71,14 L 56,76 L 44,76 Z" />
+        <EllipseGeometry Center="50,85" RadiusX="11.5" RadiusY="11.5" />
+    </GeometryGroup>
+
     <!--  ── Schrift ─────────────────────────────────────────────────────────  -->
     <Style x:Key="Title" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />

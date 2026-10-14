@@ -4,6 +4,28 @@ Alle nennenswerten Änderungen an AIlight. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.1.0] — 2026-10-14
+
+### Neu
+
+- **Neue Marke**: Das Programmsymbol ist jetzt ein Lichtstrahl, der aus einem
+  leuchtenden Punkt aufgeht — bewusst kein vierstrahliges „KI-Funkeln“, wie es
+  viele Assistenten benutzen. `tools/make_icon.py` zeichnet es reproduzierbar in
+  neun Größen (16 bis 256 px); als Vektorgrafik (`Icon.Beam`) sitzt dieselbe Form
+  in der Leiste, in den Einstellungen und in den Zeilen der Vorschläge.
+- **Einheitliche Sprache**: README auf Deutsch (wie Programm, Kommentare und
+  Changelog), mit Bildern, Badges und dem neuen Logo.
+- `docs/bilder/logo.png` kommt direkt aus der 256-px-Ebene des Symbols — README
+  und Programmsymbol können nicht auseinanderlaufen.
+
+### Behoben
+
+- **Schein am Symbolrand**: Der Lichtschein des Symbols lief über die
+  abgerundete Fläche hinaus und wurde an der Bildkante hart abgeschnitten (bei
+  256 px ein flacher grauer Streifen über die volle Breite). Strahl, Hof und
+  Kernlicht werden jetzt auf die Fläche beschnitten — im Generator und in der
+  vom Programm gezeichneten Ersatzfassung.
+
 ## [2.0.0] — 2026-10-14
 
 ### Neu

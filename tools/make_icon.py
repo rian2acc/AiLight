@@ -1,7 +1,9 @@
-"""Erzeugt das Programmsymbol `packaging/ailight.ico` (reproduzierbar, ohne Zusatzpakete).
+"""Erzeugt das Programmsymbol `packaging/ailight.ico` (reproduzierbar).
 
-Gezeichnet wird eine abgerundete Fläche in der Akzentfarbe mit einem hellen
-„Funkeln“ darin — dieselbe Marke, die das Programm notfalls selbst zeichnet.
+Die Marke: ein Lichtstrahl, der aus einem leuchtenden Punkt nach oben
+aufgeht — „AIlight“ als Bild, klar unterscheidbar von den üblichen
+vierstrahligen KI-Funkeln. Auf einer abgerundeten Fläche in der
+Akzentfarbe, dieselbe Marke, die das Programm notfalls selbst zeichnet.
 
 Aufruf:
     python tools/make_icon.py            # schreibt packaging/ailight.ico
@@ -9,121 +11,125 @@ Aufruf:
 
 from __future__ import annotations
 
-import math
 import struct
 import sys
-import zlib
 from pathlib import Path
 
-ACCENT_TOP = (0x62, 0x9B, 0xFF)
-ACCENT_BOTTOM = (0x3B, 0x74, 0xE8)
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
+
+# Dieselben Farben wie das dunkle Leisten-Thema (Theme.xaml).
+ACCENT_TOP = (0x6E, 0xA8, 0xFF)
+ACCENT_BOTTOM = (0x2F, 0x6B, 0xE0)
+CORE = (0xFF, 0xFF, 0xFF)
+HALO = (0xE8, 0xF1, 0xFF)
+
 SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 SUPERSAMPLE = 4
 
 OUT = Path(__file__).resolve().parent.parent / "packaging" / "ailight.ico"
 
 
-def rounded_square_coverage(x: float, y: float, size: float, radius: float) -> float:
-    """1.0 = vollständig innerhalb, 0.0 = außerhalb (weiche Kante wird später gemittelt)."""
-    inset = size * 0.045  # kleiner Rand, damit die Rundung atmen kann
-    left, top = inset, inset
-    right, bottom = size - inset, size - inset
-    if x < left or x > right or y < top or y > bottom:
-        return 0.0
+def render(size: int) -> Image.Image:
+    """Die Marke in voller Größe zeichnen (weiche Kanten über Weichzeichnen)."""
+    s = size * SUPERSAMPLE
+    small = size <= 24  # kleine Größen brauchen kräftigere Formen
 
-    cx = min(max(x, left + radius), right - radius)
-    cy = min(max(y, top + radius), bottom - radius)
-    return 1.0 if math.hypot(x - cx, y - cy) <= radius else 0.0
+    image = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+
+    # ── Abgerundete Fläche mit sanftem Verlauf ─────────────────────────────
+    inset = s * 0.045
+    radius = s * (0.26 if small else 0.225)
+    face = Image.new("L", (s, s), 0)
+    ImageDraw.Draw(face).rounded_rectangle(
+        [inset, inset, s - inset, s - inset], radius=radius, fill=255)
+
+    gradient = Image.linear_gradient("L").resize((s, s))
+    top = Image.new("RGBA", (s, s), (*ACCENT_TOP, 255))
+    bottom = Image.new("RGBA", (s, s), (*ACCENT_BOTTOM, 255))
+    image.paste(Image.composite(bottom, top, gradient), (0, 0), face)
+
+    center_x = s * 0.5
+    orb_y = s * (0.79 if small else 0.80)
+    orb_r = s * (0.125 if small else 0.108)
+
+    # ── Lichtstrahl: unten schmal, nach oben offen, nach oben verblassend ──
+    beam = Image.new("L", (s, s), 0)
+    draw = ImageDraw.Draw(beam)
+    top_y = s * (0.155 if small else 0.15)
+    bottom_y = orb_y - orb_r * 0.55
+    width_top = s * (0.215 if small else 0.20)
+    width_bottom = s * (0.052 if small else 0.042)
+    draw.polygon(
+        [
+            (center_x - width_top, top_y),
+            (center_x + width_top, top_y),
+            (center_x + width_bottom, bottom_y),
+            (center_x - width_bottom, bottom_y),
+        ],
+        fill=255,
+    )
+    beam = beam.filter(ImageFilter.GaussianBlur(s * (0.014 if small else 0.011)))
+
+    # Der Strahl bleibt bewusst halbtransparent — hell genug, um zu leuchten,
+    # aber der Lichtpunkt darunter soll der einzige ganz helle Fleck sein.
+    fade = Image.linear_gradient("L").resize((s, s)).point(
+        lambda value: int(255 * (0.30 + 0.44 * (value / 255.0))))
+    beam = ImageChops.multiply(beam, fade)
+    # Alles Licht bleibt innerhalb der Fläche — sonst franst der Schein am
+    # Rand des Symbols aus und wird hart abgeschnitten.
+    beam = ImageChops.multiply(beam, face)
+    image.paste(Image.new("RGBA", (s, s), (*CORE, 255)), (0, 0), beam)
+
+    # ── Lichtpunkt (die Quelle) mit weichem Hof ────────────────────────────
+    halo = Image.new("L", (s, s), 0)
+    halo_draw = ImageDraw.Draw(halo)
+    halo_draw.ellipse(
+        [center_x - orb_r * 2.3, orb_y - orb_r * 2.3,
+         center_x + orb_r * 2.3, orb_y + orb_r * 2.3],
+        fill=120)
+    halo = ImageChops.multiply(halo.filter(ImageFilter.GaussianBlur(s * 0.05)), face)
+    image.paste(Image.new("RGBA", (s, s), (*HALO, 255)), (0, 0), halo)
+
+    orb = Image.new("L", (s, s), 0)
+    ImageDraw.Draw(orb).ellipse(
+        [center_x - orb_r, orb_y - orb_r, center_x + orb_r, orb_y + orb_r],
+        fill=255)
+    orb = ImageChops.multiply(orb.filter(ImageFilter.GaussianBlur(s * 0.008)), face)
+    image.paste(Image.new("RGBA", (s, s), (*CORE, 255)), (0, 0), orb)
+
+    return image.resize((size, size), Image.LANCZOS)
 
 
-def sparkle_coverage(x: float, y: float, size: float) -> float:
-    """Vierstrahliges Funkeln (Astroide): |u|^0.5 + |v|^0.5 <= 1."""
-    center = size / 2
-    reach = size * 0.30
-    u = abs(x - center) / reach
-    v = abs(y - center) / reach
-    return 1.0 if math.sqrt(u) + math.sqrt(v) <= 1.0 else 0.0
+def png_bytes(image: Image.Image) -> bytes:
+    """PNG direkt aus PIL — kleine Dateien für die großen Größen."""
+    import io
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
 
 
-def build_pixels(size: int) -> bytes:
-    """BGRA-Zeilen von unten nach oben (BMP-Reihenfolge innerhalb des ICO)."""
-    radius = size * 0.22
-    rows = []
-    step = 1.0 / SUPERSAMPLE
-    offset = step / 2
-
+def bmp_bytes(image: Image.Image) -> bytes:
+    """Klassisches ICO-Bitmap (BGRA, Zeilen von unten nach oben)."""
+    size = image.size[0]
+    rgba = image.convert("RGBA")
+    rows = bytearray()
     for y in range(size - 1, -1, -1):
-        row = bytearray()
         for x in range(size):
-            inside = 0.0
-            sparkle = 0.0
-            for sy in range(SUPERSAMPLE):
-                for sx in range(SUPERSAMPLE):
-                    px = x + offset + sx * step
-                    py = y + offset + sy * step
-                    if rounded_square_coverage(px, py, size, radius) > 0:
-                        inside += 1.0
-                        if sparkle_coverage(px, py, size) > 0:
-                            sparkle += 1.0
+            r, g, b, a = rgba.getpixel((x, y))
+            rows += bytes((b, g, r, a))
 
-            samples = SUPERSAMPLE * SUPERSAMPLE
-            alpha = inside / samples
-            if alpha <= 0:
-                row += b"\x00\x00\x00\x00"
-                continue
-
-            mix = sparkle / samples
-            level = y / max(1, size - 1)
-            base = (
-                int(ACCENT_TOP[0] + (ACCENT_BOTTOM[0] - ACCENT_TOP[0]) * level),
-                int(ACCENT_TOP[1] + (ACCENT_BOTTOM[1] - ACCENT_TOP[1]) * level),
-                int(ACCENT_TOP[2] + (ACCENT_BOTTOM[2] - ACCENT_TOP[2]) * level),
-            )
-            color = (
-                int(base[0] + (255 - base[0]) * mix),
-                int(base[1] + (255 - base[1]) * mix),
-                int(base[2] + (255 - base[2]) * mix),
-            )
-            row += bytes((color[2], color[1], color[0], int(alpha * 255)))
-
-        rows.append(bytes(row))
-
-    return b"".join(rows)
-
-
-def png_bytes(size: int) -> bytes:
-    """Einfacher PNG-Kodierer (RGBA) — kleine Dateien für die großen Größen."""
-    pixels = build_pixels(size)
-    raw = bytearray()
-    stride = size * 4
-    for row in range(size):
-        raw.append(0)  # Filter „None“
-        raw += pixels[row * stride : (row + 1) * stride]
-
-    def chunk(tag: bytes, data: bytes) -> bytes:
-        return (struct.pack(">I", len(data)) + tag + data
-                + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
-
-    header = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
-    return (b"\x89PNG\r\n\x1a\n"
-            + chunk(b"IHDR", header)
-            + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
-            + chunk(b"IEND", b""))
-
-
-def bmp_bytes(size: int) -> bytes:
-    """BMP-Fassung für die kleinen Größen (klassisches ICO-Format)."""
-    pixels = build_pixels(size)
-    header = struct.pack("<IiiHHIIiiII", 40, size, size * 2, 1, 32, 0, len(pixels), 0, 0, 0, 0)
+    header = struct.pack("<IiiHHIIiiII", 40, size, size * 2, 1, 32, 0, len(rows), 0, 0, 0, 0)
     mask_row = ((size + 31) // 32) * 4
     mask = b"\x00" * (mask_row * size)
-    return header + pixels + mask
+    return header + bytes(rows) + mask
 
 
 def main() -> int:
     entries = []
     for size in SIZES:
-        entries.append((size, png_bytes(size) if size >= 64 else bmp_bytes(size)))
+        image = render(size)
+        entries.append((size, png_bytes(image) if size >= 64 else bmp_bytes(image)))
 
     header = struct.pack("<HHH", 0, 1, len(entries))
     directory = b""

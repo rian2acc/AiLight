@@ -44,13 +44,15 @@
                         VerticalAlignment="Center"
                         Background="{DynamicResource Brush.Selection}"
                         CornerRadius="{DynamicResource Radius.Field}">
-                        <TextBlock
+                        <Path
                             x:Name="Brand"
+                            Width="19"
+                            Height="19"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            FontSize="17"
-                            Foreground="{DynamicResource Brush.Accent}"
-                            Text="✦" />
+                            Data="{StaticResource Icon.Beam}"
+                            Fill="{DynamicResource Brush.Accent}"
+                            Stretch="Uniform" />
                     </Border>
 
                     <Grid Grid.Column="1" VerticalAlignment="Center">
