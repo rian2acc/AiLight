@@ -35,13 +35,13 @@
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
 | **Selbsttest eingebaut** | `AIlight.exe --selftest` → 43 Prüfungen, teils auf Pixel-Ebene |
-| **Installer** | 48 MB Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
+| **Installer** | 48,5 MB (46,3 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
 
 ## 📥 Installation
 
 ### Variante A: Installer (empfohlen)
 
-1. **`AIlightSetup.exe`** aus der [neuesten Fassung](https://github.com/rian2acc/AiLight/releases/latest) laden (≈48 MB)
+1. **`AIlightSetup.exe`** aus der [neuesten Fassung](https://github.com/rian2acc/AiLight/releases/latest) laden (48,5 MB)
 2. Ausführen — installiert nach `%LOCALAPPDATA%\AIlight`, legt Startmenü-Eintrag und Autostart an
 3. Beim ersten Start öffnet sich das Einstellungsfenster → **Groq-API-Schlüssel** einfügen (kostenlos auf [console.groq.com/keys](https://console.groq.com/keys))
 4. `Alt+Space` drücken und fragen
@@ -192,8 +192,8 @@ docs/bilder/           Bilder für dieses README
 | Erstes Antwort-Token | 0,4–0,6 s |
 | Leerlauf-CPU | 0 % |
 | Leerlauf-RAM | ca. 90 MB |
-| Installergröße | 48 MB (inklusive .NET 8) |
-| Installierte Größe | ca. 145 MB |
+| Installergröße | 48,5 MB (46,3 MiB, inklusive .NET 8) |
+| Installierte Größe | ca. 145 MB (144,7 MiB) |
 
 ## ⚠️ Bekannte Grenzen
 
