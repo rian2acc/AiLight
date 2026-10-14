@@ -5,9 +5,6 @@ dist/
 *.user
 *.suo
 
-# Arbeitsdaten der Entwicklungsumgebung
-.freebuff/
-
 # Nutzerdaten — leben eigentlich nur in %APPDATA%\AIlight und dürfen
 # aus Sicherheitsgründen nie im Repository landen
 settings.json
