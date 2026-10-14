@@ -193,7 +193,7 @@ docs/bilder/           Bilder für dieses README
 | Leerlauf-CPU | 0 % |
 | Leerlauf-RAM | ca. 90 MB |
 | Installergröße | 48,5 MB (46,3 MiB, inklusive .NET 8) |
-| Installierte Größe | ca. 145 MB (144,7 MiB) |
+| Installierte Größe | ca. 152 MB (145 MiB) Programmdateien, mit Deinstallierer 156 MB (149 MiB) |
 
 ## ⚠️ Bekannte Grenzen
 
