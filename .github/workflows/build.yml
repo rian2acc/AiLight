@@ -12,6 +12,11 @@ env:
   DOTNET_VERSION: '8.0.x'
   INNO_SETUP_VERSION: '6.2.2'
 
+# Der Veröffentlichungs-Schritt hängt den Installer an das Release — dafür
+# braucht das automatische Token Schreibrechte auf den Inhalt des Repos.
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build & Self-Test
@@ -35,7 +40,9 @@ jobs:
 
       - name: Run Self-Test (43 assertions)
         run: |
-          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish -p:PublishSingleFile=true -p:PublishTrimmed=true --self-contained true -r win-x64
+          # Gleicher Publish wie tools/build.ps1: self-contained, ohne Trimmen —
+          # Trimmen unterstützt WPF/WinForms nicht (NETSDK1175) und kann Laufzeitcode entfernen.
+          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
           cd dist/publish
           .\AIlight.exe --selftest
 
@@ -69,7 +76,7 @@ jobs:
 
       - name: Build installer
         run: |
-          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish -p:PublishSingleFile=true -p:PublishTrimmed=true --self-contained true -r win-x64
+          dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
           iscc packaging/ailight.iss
 
       - name: Upload installer

@@ -55,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1
 # Output: dist\installer\AIlightSetup.exe
 ```
 
-> The build script runs the 43-assertion self-test, publishes a trimmed single-file EXE, and packages the installer. Flags: `-SkipTest`, `-SkipInstaller`.
+> The build script runs the 43-assertion self-test, publishes a self-contained EXE folder (no .NET installation needed), and packages the installer. Flags: `-SkipTest`, `-SkipInstaller`.
 
 ---
 
@@ -177,7 +177,7 @@ packaging/             ailight.iss (Inno Setup), ailight.ico
 
 **Design choices:**
 
-- **Single EXE**, no background service, no plugin system
+- **One program**, self-contained — no background service, no plugin system
 - **Preloaded bar** built during idle → first hotkey ~6–40 ms
 - **Direct Groq API** — no proxy, no telemetry
 - **Self-test ships in the EXE** — tests exactly what users run
