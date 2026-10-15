@@ -1,7 +1,7 @@
 # AIlight
 
 <p align="center">
-  <img src="docs/bilder/logo.png" alt="AIlight-Logo: ein Lichtstrahl, der aus einem Punkt aufgeht" width="120" height="120">
+  <img src="docs/bilder/logo.png" alt="AIlight-Logo: ein Lichtpunkt, aus dem drei Strahlen nach unten gehen — die beiden äußeren ergeben mit dem Querstrich ein A, der mittlere Strahl ist das I" width="120" height="120">
 </p>
 
 <p align="center">
