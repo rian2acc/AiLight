@@ -415,6 +415,10 @@
                                             Content="Leiste schließen, wenn der Fokus verloren geht"
                                             Style="{StaticResource Switch}"
                                             Unchecked="OnControlChanged" />
+                                        <TextBlock
+                                            Margin="0,-6,0,12"
+                                            Style="{StaticResource Caption}"
+                                            Text="Unabhängig davon tritt die Leiste immer zurück, wenn sich die Einstellungen öffnen — sie schwebt nie davor." />
                                         <CheckBox
                                             x:Name="LogCheck"
                                             Checked="OnControlChanged"

@@ -13,244 +13,268 @@
     ShowActivated="True"
     ShowInTaskbar="False"
     SizeToContent="Height"
+    SnapsToDevicePixels="True"
     SourceInitialized="OnSourceInitialized"
+    TextOptions.TextFormattingMode="Display"
     Topmost="True"
+    UseLayoutRounding="True"
     Visibility="Hidden"
     WindowStartupLocation="Manual"
     WindowStyle="None">
 
-    <Grid Margin="12">
+    <!--
+      Der äußere Rand gehört dem Schatten (sonst würde er am Bildrand abgeschnitten).
+      „Root“ trägt die Bewegung: Deckkraft, ein Hauch Auftrieb und ein kaum
+      sichtbares Wachsen beim Erscheinen. Siehe Views/Motion.cs.
+    -->
+    <Grid x:Name="Root" Margin="12" RenderTransformOrigin="0.5,0">
+        <Grid.RenderTransform>
+            <TransformGroup>
+                <ScaleTransform x:Name="BarScale" ScaleX="1" ScaleY="1" />
+                <TranslateTransform x:Name="BarShift" Y="0" />
+            </TransformGroup>
+        </Grid.RenderTransform>
+
         <!-- Nur der Schatten: liegt hinter dem Inhalt, damit die Schrift scharf bleibt. -->
         <Border Style="{StaticResource Chrome.ShadowLayer}" />
 
         <Border x:Name="Shell" Style="{StaticResource Chrome.Shell}">
-            <StackPanel>
+            <Grid>
+                <!--
+                  Glasigkeit: ein weicher Lichtschein von oben, der genau innerhalb
+                  des abgerundeten Rahmens bleibt. Er liegt hinter dem Inhalt, ist
+                  nicht anklickbar und bewegt sich nie.
+                -->
+                <Border x:Name="Sheen" Style="{StaticResource Chrome.Sheen}" />
 
-                <!--  ── Eingabezeile  ───────────────────────────────────────  -->
-                <Grid Height="58">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="52" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <StackPanel>
 
-                    <!--  Wie ein „Spotlight“-Zeichen: kleiner Chip in der Akzentfarbe.  -->
-                    <Border
-                        x:Name="BrandChip"
-                        Grid.Column="0"
-                        Width="34"
-                        Height="34"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource Brush.Selection}"
-                        CornerRadius="{DynamicResource Radius.Field}">
-                        <Path
-                            x:Name="Brand"
-                            Width="19"
-                            Height="19"
+                    <!--  ── Eingabezeile  ───────────────────────────────────────  -->
+                    <Grid Height="60">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="54" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!--  Wie ein „Spotlight“-Zeichen: kleiner Chip in der Akzentfarbe.  -->
+                        <Border
+                            x:Name="BrandChip"
+                            Grid.Column="0"
+                            Width="34"
+                            Height="34"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Data="{StaticResource Icon.Beam}"
-                            Fill="{DynamicResource Brush.Accent}"
-                            Stretch="Uniform" />
+                            Background="{DynamicResource Brush.Selection}"
+                            CornerRadius="{DynamicResource Radius.Field}">
+                            <Path
+                                x:Name="Brand"
+                                Width="19"
+                                Height="19"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Data="{StaticResource Icon.Beam}"
+                                Fill="{DynamicResource Brush.Accent}"
+                                Stretch="Uniform" />
+                        </Border>
+
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <TextBox
+                                x:Name="Input"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                CaretBrush="{DynamicResource Brush.Text}"
+                                FontFamily="{DynamicResource Font.Ui}"
+                                FontSize="17"
+                                Foreground="{DynamicResource Brush.Text}"
+                                SelectionBrush="{DynamicResource Brush.Accent}"
+                                SpellCheck.IsEnabled="False"
+                                TextChanged="OnInputChanged"
+                                VerticalContentAlignment="Center" />
+                            <TextBlock
+                                x:Name="Placeholder"
+                                FontFamily="{DynamicResource Font.Ui}"
+                                FontSize="17"
+                                Foreground="{DynamicResource Brush.Muted}"
+                                IsHitTestVisible="False"
+                                Text="Frage stellen — oder /help"
+                                VerticalAlignment="Center" />
+                        </Grid>
+
+                        <StackPanel
+                            Grid.Column="2"
+                            Margin="8,0,14,0"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                            <TextBlock
+                                x:Name="Spinner"
+                                Margin="0,0,8,0"
+                                FontSize="14"
+                                Foreground="{DynamicResource Brush.Accent}"
+                                Text="●"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="StopButton"
+                                Click="OnStopClicked"
+                                Content="Stopp"
+                                Style="{StaticResource Bar.Button}"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!--  Trennlinie: nur da, wenn Vorschläge da sind  -->
+                    <Border Height="1" Background="{DynamicResource Brush.Separator}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=SuggestionList}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                     </Border>
 
-                    <Grid Grid.Column="1" VerticalAlignment="Center">
-                        <TextBox
-                            x:Name="Input"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            CaretBrush="{DynamicResource Brush.Text}"
-                            FontFamily="{DynamicResource Font.Ui}"
-                            FontSize="17"
-                            Foreground="{DynamicResource Brush.Text}"
-                            SelectionBrush="{DynamicResource Brush.Accent}"
-                            SpellCheck.IsEnabled="False"
-                            TextChanged="OnInputChanged"
-                            VerticalContentAlignment="Center" />
-                        <TextBlock
-                            x:Name="Placeholder"
-                            FontFamily="{DynamicResource Font.Ui}"
-                            FontSize="17"
-                            Foreground="{DynamicResource Brush.Muted}"
-                            IsHitTestVisible="False"
-                            Text="Frage stellen — oder /help"
-                            VerticalAlignment="Center" />
-                    </Grid>
-
-                    <StackPanel
-                        Grid.Column="2"
-                        Margin="8,0,14,0"
-                        VerticalAlignment="Center"
-                        Orientation="Horizontal">
-                        <TextBlock
-                            x:Name="Spinner"
-                            Margin="0,0,8,0"
-                            FontSize="14"
-                            Foreground="{DynamicResource Brush.Accent}"
-                            Text="●"
-                            Visibility="Collapsed" />
-                        <Button
-                            x:Name="StopButton"
-                            Click="OnStopClicked"
-                            Content="Stopp"
-                            Style="{StaticResource Bar.Button}"
-                            Visibility="Collapsed" />
-                    </StackPanel>
-                </Grid>
-
-                <!--  Trennlinie: nur da, wenn Vorschläge da sind  -->
-                <Border Height="1" Background="{DynamicResource Brush.Separator}">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Visibility, ElementName=SuggestionList}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                </Border>
-
-                <!--  ── Vorschläge  ─────────────────────────────────────────  -->
-                <ScrollViewer
-                    x:Name="SuggestionScroll"
-                    MaxHeight="312"
-                    Margin="0,3,0,5"
-                    HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="SuggestionList">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Border
-                                        x:Name="Divider"
-                                        Height="1"
-                                        Margin="12,-3,12,0"
-                                        VerticalAlignment="Top"
-                                        Background="{DynamicResource Brush.Separator}"
-                                        Visibility="Collapsed" />
-                                    <Border x:Name="RowShell" Style="{StaticResource Suggest.Row}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="3" />
-                                                <ColumnDefinition Width="26" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Border
-                                                x:Name="Mark"
-                                                Width="3"
-                                                Height="18"
-                                                VerticalAlignment="Center"
-                                                Background="Transparent"
-                                                CornerRadius="2" />
-                                            <TextBlock
-                                                x:Name="Glyph"
-                                                Grid.Column="1"
-                                                Style="{StaticResource Suggest.Glyph}"
-                                                Text="{Binding Glyph}" />
-                                            <TextBlock
-                                                Grid.Column="2"
-                                                Margin="2,0,0,0"
-                                                Style="{StaticResource Suggest.Title}"
-                                                Text="{Binding Title}" />
-                                            <TextBlock
-                                                Grid.Column="3"
-                                                MaxWidth="300"
-                                                Style="{StaticResource Suggest.Subtitle}"
-                                                Text="{Binding Subtitle}" />
-                                        </Grid>
-                                    </Border>
-                                </Grid>
-                                <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding ShowSeparator}" Value="True">
-                                        <Setter TargetName="Divider" Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                    <!--  Zeile unter dem Mauszeiger: leichte Aufhellung wie in einer macOS-Liste.  -->
-                                    <Trigger SourceName="RowShell" Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Hover}" />
-                                    </Trigger>
-                                    <DataTrigger Binding="{Binding IsAsk}" Value="True">
-                                        <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-                                    </DataTrigger>
-                                    <!--  Die Auswahl gewinnt immer (steht bewusst nach dem Hover).  -->
-                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                        <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Selection}" />
-                                        <Setter TargetName="Mark" Property="Background" Value="{DynamicResource Brush.Accent}" />
-                                        <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-                                    </DataTrigger>
-                                </DataTemplate.Triggers>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <!--  Denk-Schritte (eingeklappt, nur wenn vorhanden)  -->
-                <Border
-                    x:Name="ThinkingBox"
-                    Margin="12,3,12,7"
-                    Padding="12,7"
-                    Background="{DynamicResource Brush.Code}"
-                    CornerRadius="{DynamicResource Radius.Field}"
-                    Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock
-                            x:Name="ThinkingHeader"
-                            Cursor="Hand"
-                            FontSize="11"
-                            Foreground="{DynamicResource Brush.Muted}"
-                            MouseLeftButtonUp="OnThinkingToggled"
-                            Text="▸ Denk-Schritte anzeigen" />
-                        <TextBlock
-                            x:Name="ThinkingText"
-                            Margin="0,5,0,0"
-                            FontSize="12"
-                            Foreground="{DynamicResource Brush.Muted}"
-                            TextWrapping="Wrap"
-                            Visibility="Collapsed" />
-                    </StackPanel>
-                </Border>
-
-                <!--  ── Antwort  ────────────────────────────────────────────  -->
-                <Border
-                    x:Name="AnswerBox"
-                    Margin="0,0,0,2"
-                    Visibility="Collapsed">
+                    <!--  ── Vorschläge  ─────────────────────────────────────────  -->
                     <ScrollViewer
-                        x:Name="AnswerScroll"
+                        x:Name="SuggestionScroll"
+                        MaxHeight="312"
+                        Margin="0,4,0,6"
                         HorizontalScrollBarVisibility="Disabled"
-                        Padding="0"
                         VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="AnswerPanel" Margin="18,4,18,10" />
+                        <ItemsControl x:Name="SuggestionList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Border
+                                            x:Name="Divider"
+                                            Height="1"
+                                            Margin="12,-3,12,0"
+                                            VerticalAlignment="Top"
+                                            Background="{DynamicResource Brush.Separator}"
+                                            Visibility="Collapsed" />
+                                        <Border x:Name="RowShell" Style="{StaticResource Suggest.Row}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="3" />
+                                                    <ColumnDefinition Width="26" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border
+                                                    x:Name="Mark"
+                                                    Width="3"
+                                                    Height="18"
+                                                    VerticalAlignment="Center"
+                                                    Background="Transparent"
+                                                    CornerRadius="2" />
+                                                <TextBlock
+                                                    x:Name="Glyph"
+                                                    Grid.Column="1"
+                                                    Style="{StaticResource Suggest.Glyph}"
+                                                    Text="{Binding Glyph}" />
+                                                <TextBlock
+                                                    Grid.Column="2"
+                                                    Margin="2,0,0,0"
+                                                    Style="{StaticResource Suggest.Title}"
+                                                    Text="{Binding Title}" />
+                                                <TextBlock
+                                                    Grid.Column="3"
+                                                    MaxWidth="300"
+                                                    Style="{StaticResource Suggest.Subtitle}"
+                                                    Text="{Binding Subtitle}" />
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding ShowSeparator}" Value="True">
+                                            <Setter TargetName="Divider" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <!--  Zeile unter dem Mauszeiger: leichte Aufhellung wie in einer macOS-Liste.  -->
+                                        <Trigger SourceName="RowShell" Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Hover}" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding IsAsk}" Value="True">
+                                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                        </DataTrigger>
+                                        <!--  Die Auswahl gewinnt immer (steht bewusst nach dem Hover).  -->
+                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                            <Setter TargetName="RowShell" Property="Background" Value="{DynamicResource Brush.Selection}" />
+                                            <Setter TargetName="Mark" Property="Background" Value="{DynamicResource Brush.Accent}" />
+                                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </ScrollViewer>
-                </Border>
 
-                <!--  ── Fußzeile  ───────────────────────────────────────────  -->
-                <Border
-                    x:Name="Footer"
-                    Height="27"
-                    Padding="16,0"
-                    Background="{DynamicResource Brush.Code}"
-                    CornerRadius="0,0,13,13">
-                    <Grid>
-                        <TextBlock
-                            x:Name="Hint"
-                            FontSize="11"
-                            Foreground="{DynamicResource Brush.Muted}"
-                            Text="Enter fragt · Strg+, Einstellungen · Esc schließt"
-                            VerticalAlignment="Center" />
-                        <TextBlock
-                            x:Name="Meta"
-                            HorizontalAlignment="Right"
-                            FontSize="11"
-                            Foreground="{DynamicResource Brush.Muted}"
-                            Text=""
-                            VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-            </StackPanel>
+                    <!--  Denk-Schritte (eingeklappt, nur wenn vorhanden)  -->
+                    <Border
+                        x:Name="ThinkingBox"
+                        Margin="12,3,12,7"
+                        Padding="12,7"
+                        Background="{DynamicResource Brush.Code}"
+                        CornerRadius="{DynamicResource Radius.Field}"
+                        Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="ThinkingHeader"
+                                Cursor="Hand"
+                                FontSize="11"
+                                Foreground="{DynamicResource Brush.Muted}"
+                                MouseLeftButtonUp="OnThinkingToggled"
+                                Text="▸ Denk-Schritte anzeigen" />
+                            <TextBlock
+                                x:Name="ThinkingText"
+                                Margin="0,5,0,0"
+                                FontSize="12"
+                                Foreground="{DynamicResource Brush.Muted}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
+
+                    <!--  ── Antwort  ────────────────────────────────────────────  -->
+                    <Border
+                        x:Name="AnswerBox"
+                        Margin="0,0,0,2"
+                        Visibility="Collapsed">
+                        <ScrollViewer
+                            x:Name="AnswerScroll"
+                            HorizontalScrollBarVisibility="Disabled"
+                            Padding="0"
+                            VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="AnswerPanel" Margin="18,6,18,12" />
+                        </ScrollViewer>
+                    </Border>
+
+                    <!--  ── Fußzeile  ───────────────────────────────────────────  -->
+                    <Border
+                        x:Name="Footer"
+                        Height="28"
+                        Padding="16,0"
+                        Background="{DynamicResource Brush.Code}"
+                        CornerRadius="0,0,13,13">
+                        <Grid>
+                            <TextBlock
+                                x:Name="Hint"
+                                FontSize="11"
+                                Foreground="{DynamicResource Brush.Muted}"
+                                Text="Enter fragt · Strg+, Einstellungen · Esc schließt"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="Meta"
+                                HorizontalAlignment="Right"
+                                FontSize="11"
+                                Foreground="{DynamicResource Brush.Muted}"
+                                Text=""
+                                VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

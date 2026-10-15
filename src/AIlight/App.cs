@@ -237,29 +237,35 @@ public sealed class App : Application
 
     public void ToggleBar()
     {
+        // Solange die Einstellungen offen sind, gehören sie nach vorn: Die Leiste
+        // ist immer im Vordergrund und würde sonst davor schweben.
+        if (_settings is { } open)
+        {
+            if (open.WindowState == WindowState.Minimized)
+            {
+                open.WindowState = WindowState.Normal;
+            }
+
+            open.Activate();
+            return;
+        }
+
         var bar = EnsureBar();
         bar.Toggle();
     }
 
     public void OpenSettings()
     {
+        // Die Leiste tritt zurück, statt vor den Einstellungen zu schweben —
+        // genau das war der störende Fall. Fokus holt sie sich dabei nicht
+        // zurück, sonst nähme sie dem neuen Fenster sofort die Tastatur weg.
+        _bar?.YieldToSettings();
+
         if (_settings is null)
         {
             Log.Info("Einstellungen geöffnet");
             _settings = new SettingsWindow(Settings, Chat);
-            _settings.Closed += (_, _) =>
-            {
-                _settings = null;
-                if (_bar is { } bar)
-                {
-                    bar.SuppressAutoHide = false;
-                }
-            };
-        }
-
-        if (_bar is { } existing)
-        {
-            existing.SuppressAutoHide = true;
+            _settings.Closed += (_, _) => _settings = null;
         }
 
         _settings.Show();

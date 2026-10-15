@@ -31,6 +31,16 @@ internal static class Program
             return SelfTest.RunAll();
         }
 
+        // Messmodi gehören nicht der laufenden Sitzung: Wer Bildschirmfotos machen
+        // oder einen Messlauf starten will, soll das auch dann können, wenn im
+        // Infobereich bereits eine Fassung wartet. (Beide würden sich sonst nur
+        // gegenseitig benachrichten, und der Messlauf stürbe wortlos.)
+        if (options.Shot.Length > 0 || options.SmokeSeconds > 0 || options.AskUi.Length > 0 || options.Ask.Length > 0)
+        {
+            var measuring = new App(options);
+            return measuring.Run();
+        }
+
         using var single = new SingleInstance();
         if (!single.IsFirst)
         {

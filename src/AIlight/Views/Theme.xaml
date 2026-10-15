@@ -114,11 +114,14 @@
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Shell}" />
         <Setter Property="Effect">
             <Setter.Value>
+                <!--  Zwei Schatten in einem: ein weiter, weicher Hof und eine engere
+                      Kante darunter. Erst dadurch hebt sich die Leiste sichtbar
+                      vom Hintergrund ab, ohne einen harten Rand zu bekommen.  -->
                 <DropShadowEffect
-                    BlurRadius="24"
+                    BlurRadius="34"
                     Color="#000000"
-                    Opacity="0.40"
-                    ShadowDepth="4" />
+                    Opacity="0.34"
+                    ShadowDepth="8" />
             </Setter.Value>
         </Setter>
     </Style>
@@ -128,6 +131,32 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Shell}" />
+    </Style>
+
+    <!--
+      Die Glasigkeit der Leiste. Ein echter Weichzeichner hinter dem Fenster
+      (Acryl) ist mit einem randlosen, abgerundeten WPF-Fenster nicht zu haben:
+      Windows zeichnet den Acryl-Hintergrund nur für nicht-geschichtete Fenster,
+      und damit fielen runde Ecken, eigene Deckkraft und der eigene Schatten weg.
+      Deshalb entsteht der Eindruck hier aus zwei Lagen: der Fläche (einstellbar
+      über die Deckkraft) und diesem Lichtschein.
+    -->
+    <Style x:Key="Chrome.Sheen" TargetType="Border">
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <!--  Nur der obere Rand: ein schmaler Lichtstreifen, der vor der Mitte
+              ausläuft. Über die ganze Höhe gelegt würde die Fläche milchig.  -->
+        <Setter Property="Height" Value="68" />
+        <Setter Property="CornerRadius" Value="{DynamicResource Radius.Shell}" />
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Offset="0" Color="#18FFFFFF" />
+                    <GradientStop Offset="0.55" Color="#04FFFFFF" />
+                    <GradientStop Offset="1" Color="#00FFFFFF" />
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!--

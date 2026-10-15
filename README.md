@@ -29,13 +29,16 @@
 | **Globaler Hotkey** | `Alt+Space` (frei wählbar) — sofort da, aus jedem Programm |
 | **Streaming-Antworten** | Der Text erscheint Wort für Wort über die Groq-API |
 | **Smarte Vorschläge** | Frühere Fragen, Befehle, Zwischenablage — per Tastatur bedienbar |
-| **macOS-Look** | Ruhige Flächen, Haarlinien, großzügige Ecken, Ampel-Knöpfe in den Einstellungen |
+| **macOS-Look** | Ruhige Flächen, Haarlinien, großzügige Ecken, ein Lichtschein von oben, Ampel-Knöpfe in den Einstellungen |
+| **Weicher Auftritt** | Die Leiste steigt auf und wächst einen Hauch — Auftritt 180 ms, Abgang 130 ms, kubisch ausklingend |
+| **Nichts springt** | Vorschlagsliste und Antwort gleiten: Auswahl wandert weich ins Bild, wachsender Text zieht sanft nach |
+| **Schwebt nie im Weg** | Öffnen die Einstellungen, zieht sich die Leiste zurück — und holt sich dabei keinen fremden Fokus |
 | **Alles anpassbar** | Akzentfarbe (9 macOS-Töne), Ecken-Radius, Schrift, Breite/Höhe/Deckkraft, Bewegung, Fußzeile |
 | **Gesprächsgedächtnis** | Einstellbare Runden, `/forget` löscht |
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
-| **Selbsttest eingebaut** | `AIlight.exe --selftest` → 43 Prüfungen, teils auf Pixel-Ebene |
-| **Installer** | 48,5 MB (46,3 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
+| **Selbsttest eingebaut** | `AIlight.exe --selftest` → 48 Prüfungen, teils auf Pixel-Ebene |
+| **Installer** | 48,5 MB (46,2 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
 
 ## 📥 Installation
 
@@ -59,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1
 # Ergebnis: dist\installer\AIlightSetup.exe
 ```
 
-> Das Skript läuft den 43-Punkte-Selbsttest, veröffentlicht eine
+> Das Skript läuft den 48-Punkte-Selbsttest, veröffentlicht eine
 
 > self-contained EXE-Mappe (kein .NET nötig) und packt den Installer. Schalter: `-SkipTest`, `-SkipInstaller`.
 
@@ -77,6 +80,10 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1
 | `Strg+N` | Neues Gespräch (Gedächtnis leeren) |
 | `Strg+H` | Verlauf öffnen |
 | `Strg+,` | Einstellungen öffnen |
+
+> Solange das Einstellungsfenster offen ist, hält sich die Leiste zurück: Sie
+> verschwindet beim Öffnen und der Hotkey holt das Einstellungsfenster nach vorn,
+> statt die Leiste darüber zu legen.
 
 **Befehle** (im leeren Eingabefeld `/` tippen):
 
@@ -106,7 +113,7 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 | Ecken-Radius | 8–22 — Leiste, Karten, Felder und Zeilen skalieren gemeinsam |
 | Schrift | System (Segoe UI Variable), Segoe UI, Calibri, Arial |
 | Leiste | Breite 420–1200, Abstand von oben 0–40, Schriftgröße 12–28, Deckkraft 60–100 % |
-| Bewegung | Einblenden und Impuls an/aus |
+| Bewegung | Auftritt und Abgang der Leiste, Nachziehen des Textes, Impuls an/aus |
 | Antwort | Denk-Schritte automatisch aufklappen, Fußzeile (Modell · Tokens · Kosten) ein/aus |
 | Verhalten | Hotkey, Autostart, Vorbereiten im Hintergrund, Schließen bei Fokusverlust, Protokoll |
 
@@ -140,7 +147,7 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 ## 🛠️ Eingebaute Diagnose
 
 ```powershell
-AIlight.exe --selftest           # 43 Prüfungen, Rückgabewert 0 = bestanden
+AIlight.exe --selftest           # 48 Prüfungen, Rückgabewert 0 = bestanden
 AIlight.exe --smoke 4            # Leiste, Hotkey, Infobereich, Größe, Position
 AIlight.exe --ask "Sag: ok"      # Frage ohne Fenster
 AIlight.exe --ask-ui "2+2?"      # Simulierte Bedienung der Leiste
@@ -162,7 +169,7 @@ src/AIlight/
   MainWindow.*         Die Leiste: Eingabe, Vorschläge, Streaming-Markdown
   SettingsWindow.*     Sieben Bereiche, Live-Vorschau, eigener Rahmen
   AppSettings.cs       Einstellungen laden/speichern (JSON)
-  SelfTest.cs          43 Prüfungen, teils auf Pixel-Ebene
+  SelfTest.cs          48 Prüfungen, teils auf Pixel-Ebene
   Commands.cs          Register der Schrägstrich-Befehle
   Suggestions.cs       Vorschlagszeilen unter der Eingabe
   Core/                Hotkey, Einzelinstanz, Schlüsselspeicher, Protokoll, Symbole, Pfade, atomares Schreiben
@@ -192,7 +199,7 @@ docs/bilder/           Bilder für dieses README
 | Erstes Antwort-Token | 0,4–0,6 s |
 | Leerlauf-CPU | 0 % |
 | Leerlauf-RAM | ca. 90 MB |
-| Installergröße | 48,5 MB (46,3 MiB, inklusive .NET 8) |
+| Installergröße | 48,5 MB (46,2 MiB, inklusive .NET 8) |
 | Installierte Größe | ca. 152 MB (145 MiB) Programmdateien, mit Deinstallierer 156 MB (149 MiB) |
 
 ## ⚠️ Bekannte Grenzen

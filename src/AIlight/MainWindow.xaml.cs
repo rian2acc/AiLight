@@ -55,6 +55,13 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cancel;
     private DispatcherTimer? _paint;
     private DispatcherTimer? _hideLater;
+    private DispatcherTimer? _hideTimer;
+    private Glide? _answerGlide;
+    private Glide? _rowGlide;
+    private bool _followAnswer;
+    private bool _hiding;
+    private string? _renderedAnswer;
+    private string? _renderedThinking;
     private bool _thinkingAutoExpanded;
     private string _lastQuestion = "";
     private AskResult? _lastResult;
@@ -75,7 +82,18 @@ public partial class MainWindow : Window
         SuggestionList.MouseMove += OnSuggestionMouseMove;
         SuggestionList.MouseLeftButtonUp += OnSuggestionClick;
         PreviewKeyUp += OnPreviewKeyUp;
+
+        // Weiches Scrollen: Vorschlagsliste und Antwort springen nie.
+        _answerGlide = new Glide(AnswerScroll);
+        _rowGlide = new Glide(SuggestionScroll);
+
+        // Wer im Text radelt, will selbst bestimmen, wo er liest — dann hört das
+        // Nachziehen ans Ende auf.
+        AnswerScroll.PreviewMouseWheel += (_, _) => _followAnswer = false;
     }
+
+    /// <summary>Bewegung nur dann, wenn wirklich ein Fenster auf dem Bildschirm steht.</summary>
+    private bool CanAnimate => _settings.AnimateBar && IsVisible;
 
     /// <summary>Zeile unter dem Mauszeiger (oder -1).</summary>
     private int RowUnderMouse()
@@ -191,8 +209,32 @@ public partial class MainWindow : Window
 
     internal string HintForTest => Hint.Text;
 
-    /// <summary>Solange true, versteckt sich die Leiste nicht beim Fokusverlust (Einstellungen offen).</summary>
-    public bool SuppressAutoHide { get; set; }
+    /// <summary>Läuft gerade ein weiches Ausblenden? (Prüfstand)</summary>
+    internal bool IsHidingForTest => _hiding;
+
+    /// <summary>Deckkraft der Leiste — der Prüfstand sieht nach, dass sie in Grundstellung zurückgeht.</summary>
+    internal double ShellOpacityForTest => Root.Opacity;
+
+    /// <summary>Auftrieb der Leiste (0 = Grundstellung).</summary>
+    internal double ShellShiftForTest => BarShift.Y;
+
+    /// <summary>Wie oft die Antwort wirklich neu aufgebaut wurde (Prüfstand).</summary>
+    internal int AnswerRenderCountForTest { get; private set; }
+
+    /// <summary>Einen Takt auslösen — der Prüfstand sieht nach, dass nichts doppelt geschieht.</summary>
+    internal void FlushForTest() => FlushAnswer();
+
+    /// <summary>
+    /// Ein eigenes Fenster übernimmt — zum Beispiel die Einstellungen. Die Leiste
+    /// zieht sich zurück, statt stur davor zu schweben, und holt dabei bewusst
+    /// keinen fremden Fokus zurück: sonst nähme sie dem neuen Fenster die Tastatur
+    /// wieder weg.
+    /// </summary>
+    public void YieldToSettings()
+    {
+        _previousWindow = IntPtr.Zero;
+        HideBar();
+    }
 
     /// <summary>Zeitpunkt des letzten Einblendens (für Messungen).</summary>
     public DateTime ShownAt { get; private set; }
@@ -231,6 +273,17 @@ public partial class MainWindow : Window
         MaxHeight = Math.Max(320, working.Height - 60);
         AnswerScroll.MaxHeight = Math.Max(180, working.Height * 0.55);
         RefreshSuggestions();
+
+        // Schrift, Breite oder Höhe ändern sich: Der Text muss mit der neuen
+        // Schrift neu gesetzt werden (vorher blieb er bis zum nächsten Takt alt).
+        InvalidateAnswer();
+        FlushAnswer();
+
+        if (IsVisible)
+        {
+            // Nach einer Breitenänderung sitzt die Leiste sonst nicht mehr mittig.
+            PlaceWindow();
+        }
     }
 
     /// <summary>Arbeitsfläche des Bildschirms, auf dem die Maus steht (in WPF-Einheiten).</summary>
@@ -269,10 +322,12 @@ public partial class MainWindow : Window
     public void ShowBar()
     {
         _previousWindow = GetForegroundWindow();
+        _hiding = false;
+        _hideTimer?.Stop();
         Show();
         PlaceWindow();
-        // Leicht einblenden, wie ein Spotlight — abschaltbar über die Einstellungen.
-        StartBarAnimation();
+        // Auftritt wie ein Spotlight — abschaltbar über die Einstellungen.
+        AnimateIn();
         Activate();
         Input.SelectAll();
         Input.Focus();
@@ -297,40 +352,115 @@ public partial class MainWindow : Window
         var screen = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
         var area = screen.WorkingArea;
         var handle = new WindowInteropHelper(this).Handle;
-        var x = area.Left + (int)((area.Width - Width * DeviceScale.X) / 2);
+
+        // Vor dem ersten Messen gibt es noch keine wirkliche Breite — dann gilt
+        // die eingestellte. Danach zählt, was wirklich dasteht, sonst sitzt die
+        // Leiste nach einer Breitenänderung nicht mehr mittig.
+        var width = (ActualWidth > 0 ? ActualWidth : Width) * DeviceScale.X;
+        var x = area.Left + (int)((area.Width - width) / 2);
         var y = area.Top + (int)(area.Height * (_settings.TopPercent / 100.0));
         SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
-    /// <summary>Kurzes Einblenden (oder sofort, wenn Animationen ausgeschaltet sind).</summary>
-    private void StartBarAnimation()
+    /// <summary>
+    /// Auftritt der Leiste: aus der Deckkraft auftauchen, einen Hauch aufsteigen
+    /// und kaum merklich wachsen. Ein reines Einblenden wirkte träge; erst die
+    /// kurze Bewegung lässt die Leiste „angekommen“ wirken.
+    /// </summary>
+    private void AnimateIn()
     {
+        ResetVisual();
+
         if (!_settings.AnimateBar)
         {
-            BeginAnimation(OpacityProperty, null);
-            Opacity = 1;
             return;
         }
 
-        BeginAnimation(OpacityProperty, null);
-        Opacity = 0;
-        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130))
-        {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-        };
-        BeginAnimation(OpacityProperty, fade);
+        Root.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.ShowMs));
+        BarShift.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(-Motion.Rise, 0, Motion.ShowDuration) { EasingFunction = Motion.Out });
+        BarScale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Out });
+        BarScale.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Out });
     }
 
+    /// <summary>Grundstellung: keine laufende Animation, keine Verschiebung.</summary>
+    private void ResetVisual()
+    {
+        Root.BeginAnimation(OpacityProperty, null);
+        BarShift.BeginAnimation(TranslateTransform.YProperty, null);
+        BarScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        BarScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        Root.Opacity = 1;
+        BarShift.Y = 0;
+        BarScale.ScaleX = 1;
+        BarScale.ScaleY = 1;
+    }
+
+    /// <summary>
+    /// Ausblenden — weich statt hart. Wird während des Ausblendens wieder geöffnet,
+    /// gehört der Abgang nicht mehr uns: <see cref="ShowBar"/> nimmt die Marke
+    /// zurück und die Leiste bleibt stehen.
+    /// </summary>
     public void HideBar()
     {
-        if (!IsVisible)
+        if (!IsVisible || _hiding)
         {
             return;
         }
 
-        BeginAnimation(OpacityProperty, null);
-        Opacity = 1;
+        if (!_settings.AnimateBar)
+        {
+            FinishHide();
+            return;
+        }
+
+        _hiding = true;
+
+        // Der Abschluss läuft über einen Zeitgeber, nicht über den Abschluss der
+        // Animation: Der Zeitgeber hängt allein am Nachrichtenumlauf und zieht
+        // auch dann durch, wenn gerade niemand zeichnet.
+        _hideTimer ??= new DispatcherTimer(DispatcherPriority.Background);
+        _hideTimer.Stop();
+        _hideTimer.Interval = TimeSpan.FromMilliseconds(Motion.HideMs + 20);
+        _hideTimer.Tick -= OnHideTimer;
+        _hideTimer.Tick += OnHideTimer;
+        _hideTimer.Start();
+
+        Root.BeginAnimation(OpacityProperty, Motion.Fade(1, 0, Motion.HideMs, Motion.In));
+        BarShift.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(0, -Motion.Rise * 0.6, Motion.HideDuration) { EasingFunction = Motion.In });
+        BarScale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(1, Motion.Grow, Motion.HideDuration) { EasingFunction = Motion.In });
+        BarScale.BeginAnimation(
+            ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(1, Motion.Grow, Motion.HideDuration) { EasingFunction = Motion.In });
+    }
+
+    private void OnHideTimer(object? sender, EventArgs e)
+    {
+        _hideTimer?.Stop();
+        if (_hiding)
+        {
+            FinishHide();
+        }
+    }
+
+    private void FinishHide()
+    {
+        _hideTimer?.Stop();
+        _hiding = false;
+        _answerGlide?.Stop();
+        _rowGlide?.Stop();
+        ResetVisual();
         Hide();
+
         if (_previousWindow != IntPtr.Zero && _previousWindow != new WindowInteropHelper(this).Handle)
         {
             SetForegroundWindow(_previousWindow);
@@ -339,6 +469,13 @@ public partial class MainWindow : Window
 
     public void Toggle()
     {
+        if (_hiding)
+        {
+            // Beim Ausblenden noch einmal gedrückt: der Nutzer will sie sehen.
+            ShowBar();
+            return;
+        }
+
         if (IsVisible && IsActive)
         {
             HideBar();
@@ -350,14 +487,14 @@ public partial class MainWindow : Window
 
     private void OnDeactivated(object sender, EventArgs e)
     {
-        if (SuppressAutoHide || !_settings.HideOnLostFocus)
+        if (!_settings.HideOnLostFocus)
         {
             return;
         }
 
         // Kurz warten: ein Klick neben die Leiste soll sie schließen, ein
         // Tray-Klick (Menü schließt sich) soll sie aber nicht sofort verstecken.
-        _hideLater ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+        _hideLater ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(160) };
         _hideLater.Stop();
         _hideLater.Tick -= OnHideLater;
         _hideLater.Tick += OnHideLater;
@@ -367,7 +504,7 @@ public partial class MainWindow : Window
     private void OnHideLater(object? sender, EventArgs e)
     {
         _hideLater?.Stop();
-        if (!IsActive && IsVisible && !SuppressAutoHide)
+        if (!IsActive && IsVisible)
         {
             HideBar();
         }
@@ -513,6 +650,8 @@ public partial class MainWindow : Window
         }
 
         _selected = _rows.Count == 0 ? -1 : Math.Clamp(previous, 0, _rows.Count - 1);
+        _rowGlide?.Stop();
+        SuggestionScroll.ScrollToTop();
         UpdateSelectionVisual();
         SuggestionList.Visibility = _rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -536,14 +675,37 @@ public partial class MainWindow : Window
         }
 
         // Mit den Pfeiltasten kann die Auswahl aus dem sichtbaren Bereich laufen —
-        // deshalb die gewählte Zeile hereinscrollen lassen. (ItemsControl kennt kein
-        // ScrollIntoView; der Container selbst holt sich ins Sichtfeld.)
+        // deshalb die gewählte Zeile hereingleiten lassen. (ItemsControl kennt kein
+        // ScrollIntoView; der Container selbst kennt seine Lage.)
         if (_selected >= 0
             && _selected < _rows.Count
             && SuggestionList.ItemContainerGenerator.ContainerFromIndex(_selected) is FrameworkElement container)
         {
-            container.BringIntoView();
+            GlideRowIntoView(container);
         }
+    }
+
+    /// <summary>
+    /// Die gewählte Zeile ins Bild holen — weich, und nur wenn sie wirklich
+    /// nicht mehr gut sichtbar ist. Ein hartes BringIntoView ließ die Liste bei
+    /// jedem Tastendruck springen, obwohl die Zeile längst zu sehen war.
+    /// </summary>
+    private void GlideRowIntoView(FrameworkElement row)
+    {
+        var viewport = SuggestionScroll.ViewportHeight;
+        if (_rowGlide is null || row.ActualHeight <= 0 || viewport <= 0)
+        {
+            return;
+        }
+
+        var top = row.TransformToAncestor(SuggestionScroll).Transform(new Point(0, 0)).Y;
+        var height = row.ActualHeight;
+        if (top >= 0 && top + height <= viewport)
+        {
+            return; // steht schon im Bild — nichts bewegen
+        }
+
+        _rowGlide.To(SuggestionScroll.VerticalOffset + top - ((viewport - height) / 2));
     }
 
     private void CompleteSelected()
@@ -716,6 +878,9 @@ public partial class MainWindow : Window
         _lastResult = null;
         _lastQuestion = "";
         _thinkingAutoExpanded = false;
+        _followAnswer = false;
+        _answerGlide?.Stop();
+        InvalidateAnswer();
         StopSpinner();
         AnswerBox.Visibility = Visibility.Collapsed;
         ThinkingBox.Visibility = Visibility.Collapsed;
@@ -789,6 +954,8 @@ public partial class MainWindow : Window
         }
 
         _selected = 0;
+        _rowGlide?.Stop();
+        SuggestionScroll.ScrollToTop();
         UpdateSelectionVisual();
         SuggestionList.Visibility = Visibility.Visible;
         SetHint($"{entries.Count} Eintrag/Einträge — Enter zeigt die Antwort, /forget <Wort> löscht.");
@@ -865,6 +1032,7 @@ public partial class MainWindow : Window
 
         _lastQuestion = question;
         Input.Clear();
+        InvalidateAnswer();
         _answer.Clear();
         _thinking.Clear();
         _lastResult = null;
@@ -872,6 +1040,10 @@ public partial class MainWindow : Window
         ThinkingBox.Visibility = Visibility.Collapsed;
         AnswerPanel.Children.Clear();
         AnswerBox.Visibility = Visibility.Visible;
+        _answerGlide?.Stop();
+        AnswerScroll.ScrollToTop();
+        _followAnswer = true;
+        RevealAnswer();
         Spinner.Visibility = Visibility.Visible;
         StartSpinner();
         StopButton.Visibility = Visibility.Visible;
@@ -960,6 +1132,8 @@ public partial class MainWindow : Window
             }
 
             _lastResult = result;
+            _followAnswer = false;
+            _answerGlide?.Stop();
             if (result.Truncated)
             {
                 SetHint("Die Antwort wurde am Token-Limit abgeschnitten — Enter setzt fort.");
@@ -1010,7 +1184,7 @@ public partial class MainWindow : Window
 
     private void StartPaintTimer()
     {
-        _paint ??= new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(70) };
+        _paint ??= new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(55) };
         _paint.Tick -= OnPaintTick;
         _paint.Tick += OnPaintTick;
         _paint.Start();
@@ -1043,7 +1217,27 @@ public partial class MainWindow : Window
     {
         FlushAnswer();
         var seconds = (DateTime.Now - _startedAt).TotalSeconds;
-        Meta.Text = $"läuft … {seconds:0,0} s";
+        Meta.Text = $"läuft · {seconds:0,0} s";
+    }
+
+    /// <summary>Erzwingt beim nächsten Takt einen vollständigen Neuaufbau der Antwort.</summary>
+    private void InvalidateAnswer()
+    {
+        _renderedAnswer = null;
+        _renderedThinking = null;
+    }
+
+    /// <summary>Die Antwort taucht auf — kurz, ohne die Anordnung zu stören.</summary>
+    private void RevealAnswer()
+    {
+        AnswerBox.BeginAnimation(OpacityProperty, null);
+        AnswerBox.Opacity = 1;
+        if (!CanAnimate)
+        {
+            return;
+        }
+
+        AnswerBox.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
     }
 
     /// <summary>Angesammelten Text als Markdown darstellen (nur während des Streamens).</summary>
@@ -1061,7 +1255,24 @@ public partial class MainWindow : Window
             thinking = _thinking.ToString();
         }
 
-        var atBottom = AnswerScroll.VerticalOffset >= AnswerScroll.ScrollableHeight - 24;
+        // Nur neu aufbauen, wenn sich wirklich etwas geändert hat. Vorher wurde
+        // bis zu zwanzigmal je Sekunde derselbe Text neu gesetzt — das flackerte
+        // und kostete mehr, als das Schreiben selbst brauchte.
+        thinking = thinking.Trim();
+        if (text == _renderedAnswer && thinking == _renderedThinking)
+        {
+            if (_followAnswer)
+            {
+                _answerGlide?.Chase();
+            }
+
+            return;
+        }
+
+        _renderedAnswer = text;
+        _renderedThinking = thinking;
+        AnswerRenderCountForTest++;
+
         AnswerPanel.Children.Clear();
         foreach (var block in Markdown.Render(text, _settings.FontSize))
         {
@@ -1071,7 +1282,7 @@ public partial class MainWindow : Window
         if (thinking.Length > 0)
         {
             ThinkingBox.Visibility = Visibility.Visible;
-            ThinkingText.Text = thinking.Trim();
+            ThinkingText.Text = thinking;
 
             // Nur einmal je Frage automatisch aufklappen — danach gehört die
             // Entscheidung dem Nutzer (sonst würde jeder Zeichentakt sie öffnen).
@@ -1083,9 +1294,10 @@ public partial class MainWindow : Window
             }
         }
 
-        if (atBottom)
+        if (_followAnswer)
         {
-            AnswerScroll.ScrollToEnd();
+            // Nicht springen: die Ansicht zieht sanft ans neue Textende nach.
+            _answerGlide?.Chase();
         }
     }
 
@@ -1100,8 +1312,7 @@ public partial class MainWindow : Window
         _lastQuestion = question;
         _lastResult = result;
         AnswerBox.Visibility = Visibility.Visible;
-        FlushAnswer();
-        AnswerScroll.ScrollToTop();
+        ShowFromTop();
         Meta.Text = FooterText(result);
     }
 
@@ -1115,10 +1326,20 @@ public partial class MainWindow : Window
 
         _lastResult = null;
         AnswerBox.Visibility = Visibility.Visible;
-        FlushAnswer();
-        AnswerScroll.ScrollToTop();
+        ShowFromTop();
         Meta.Text = "";
         Input.Focus();
+    }
+
+    /// <summary>Eine fertige Antwort von vorn zeigen — ohne Nachziehen ans Ende.</summary>
+    private void ShowFromTop()
+    {
+        _followAnswer = false;
+        _answerGlide?.Stop();
+        InvalidateAnswer();
+        FlushAnswer();
+        AnswerScroll.ScrollToTop();
+        RevealAnswer();
     }
 
     private void OnThinkingToggled(object sender, MouseButtonEventArgs e)

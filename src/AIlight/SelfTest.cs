@@ -48,6 +48,7 @@ public static class SelfTest
         TestSecrets();
         TestPayload();
         TestSuggestions();
+        TestMotion();
         TestUserInterface();
 
         Console.WriteLine(new string('-', 60));
@@ -553,7 +554,53 @@ public static class SelfTest
         });
     }
 
+    // ── Bewegung ────────────────────────────────────────────────────────────
+
+    private static void TestMotion()
+    {
+        Check("Bewegung: kurze Zeiten, weiche Kurve", () =>
+        {
+            // Die Werte sind die Hausordnung der Bewegung: Wer sie ändert, soll
+            // hier darüber stolpern, statt es auf einem Bildschirm zu spüren.
+            True(Motion.ShowMs >= 100 && Motion.ShowMs <= 320, $"Auftritt unpassend lang: {Motion.ShowMs} ms");
+            True(Motion.HideMs > 0 && Motion.HideMs <= Motion.ShowMs,
+                "Der Abgang muss kürzer sein als der Auftritt — sonst wirkt das Schließen zäh.");
+            True(Motion.GlideMs >= 80 && Motion.GlideMs <= 400, $"Scrollen unpassend: {Motion.GlideMs} ms");
+            True(Motion.Rise > 0 && Motion.Rise <= 24, "Der Auftrieb darf nur ein Hauch sein.");
+            True(Motion.Grow > 0.96 && Motion.Grow < 1.0, "Das Wachsen darf nur ein Hauch sein.");
+        });
+
+        Check("Bewegung: die Kurve läuft von 0 nach 1, ohne zurückzugehen", () =>
+        {
+            Equal(0d, Math.Round(Motion.Ease(0), 6), "Start");
+            Equal(1d, Math.Round(Motion.Ease(1), 6), "Ende");
+            True(Motion.Ease(0.5) > 0.5, "Die Kurve klingt nicht aus (wäre sie linear oder zäh)");
+            True(Motion.Ease(0.25) > Motion.Ease(0.1), "Die Kurve wird nicht schneller");
+
+            var previous = -1d;
+            for (var step = 0; step <= 20; step++)
+            {
+                var value = Motion.Ease(step / 20.0);
+                True(value >= previous, $"Die Kurve läuft bei {step}/20 zurück");
+                previous = value;
+            }
+        });
+    }
+
     // ── Oberfläche ──────────────────────────────────────────────────────────
+
+    /// <summary>Wartet, bis das weiche Ausblenden durch ist (höchstens zwei Sekunden).</summary>
+    private static void WaitUntilHidden(MainWindow bar)
+    {
+        var deadline = DateTime.Now.AddSeconds(2);
+        while (bar.IsVisible && DateTime.Now < deadline)
+        {
+            Shot.Settle(bar);
+            System.Threading.Thread.Sleep(25);
+        }
+
+        Shot.Settle(bar);
+    }
 
     private static void TestUserInterface()
     {
@@ -744,6 +791,7 @@ public static class SelfTest
                 "Switch", "Swatch", "Slider.Slim", "Suggest.Row", "Suggest.Subtitle",
                 "Icon.Beam", "Radius.Shell", "Radius.Card", "Radius.Field", "Radius.Row",
                 "Brush.Card", "Brush.Hover", "Brush.Track", "Brush.Field", "Brush.Ring",
+                "Chrome.Sheen", "Suggest.Row", "Suggest.Title", "Suggest.Glyph",
             })
             {
                 True(resources.Contains(key), $"Vorlage fehlt: {key}");
@@ -772,6 +820,101 @@ public static class SelfTest
 
                 var meta = (TextBlock)bar.FindName("Meta")!;
                 Equal(Visibility.Collapsed, meta.Visibility, "Fußzeile ausgeblendet");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Verhalten: die Leiste tritt zurück, wenn die Einstellungen öffnen", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-yield-").FullName;
+            try
+            {
+                var settings = new AppSettings { AnimateBar = true };
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+
+                // Außerhalb des Bildschirms zeigen: sichtbar wie im Betrieb, ohne Fokus zu klauen.
+                Shot.Show(bar);
+                True(bar.IsVisible, "Die Leiste ließ sich nicht zeigen");
+
+                bar.YieldToSettings();
+
+                // Sie verschwindet weich — nicht mit einem Schlag.
+                True(bar.IsVisible, "Die Leiste verschwand hart statt weich");
+                True(bar.IsHidingForTest, "Es läuft kein Ausblenden");
+
+                WaitUntilHidden(bar);
+                True(!bar.IsVisible, "Die Leiste schwebt weiter über den Einstellungen");
+                True(!bar.IsHidingForTest, "Das Ausblenden wurde nicht abgeschlossen");
+
+                // Danach steht sie wieder sauber da — der nächste Auftritt beginnt frisch.
+                Equal(1d, Math.Round(bar.ShellOpacityForTest, 3), "Deckkraft in Grundstellung");
+                Equal(0d, Math.Round(bar.ShellShiftForTest, 3), "Auftrieb in Grundstellung");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Verhalten: ohne Bewegung schließt die Leiste sofort", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-instant-").FullName;
+            try
+            {
+                var settings = new AppSettings { AnimateBar = false };
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+                Shot.Show(bar);
+
+                bar.YieldToSettings();
+                True(!bar.IsVisible, "Ohne Bewegung muss die Leiste sofort weg sein");
+
+                // Die Grundstellung bleibt auch in diesem Weg sauber.
+                Equal(1d, Math.Round(bar.ShellOpacityForTest, 3), "Deckkraft in Grundstellung");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Antwort: unveränderter Text wird nicht neu gezeichnet", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-flush-").FullName;
+            try
+            {
+                var settings = new AppSettings();
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+                bar.ApplySettings();
+
+                bar.ShowTextForTest("Test", "**fett** und `code`");
+                var afterShow = bar.AnswerRenderCountForTest;
+                True(afterShow > 0, "Die Antwort wurde gar nicht aufgebaut");
+                True(bar.AnswerBlockCount > 0, "Antwortbereich blieb leer");
+
+                // Zwanzig Takte ohne neuen Buchstaben dürfen nichts neu aufbauen —
+                // genau das ließ die Antwort früher flackern.
+                for (var tick = 0; tick < 20; tick++)
+                {
+                    bar.FlushForTest();
+                }
+
+                Equal(afterShow, bar.AnswerRenderCountForTest, "Neuaufbauten ohne neuen Text");
+                True(bar.AnswerBlockCount > 0, "Antwortbereich wurde geleert");
 
                 bar.Close();
             }

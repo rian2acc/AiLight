@@ -4,6 +4,51 @@ Alle nennenswerten Änderungen an AIlight. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.2.0] — 2026-10-15
+
+### Neu
+
+- **Auftritt wie ein Spotlight**: Die Leiste taucht aus der Deckkraft auf,
+  steigt einen Hauch auf und wächst minimal (180 ms, kubisch ausklingend) —
+  vorher war es ein reines Einblenden. Der Abgang ist kürzer (130 ms) und
+  ebenfalls weich; deshalb wirkt das Schließen nicht mehr hart. Alle Zeiten und
+  Kurven stehen an einer Stelle (`Views/Motion.cs`).
+- **Nichts springt mehr**: Die Vorschlagsliste gleitet zur gewählten Zeile,
+  statt bei jedem Tastendruck zu springen (`Views/Glide.cs`) — und nur dann,
+  wenn die Zeile wirklich nicht mehr im Bild ist. Die Antwort zieht beim
+  Schreiben sanft ans Textende nach, statt in Stufen zu hüpfen.
+- **Lichtschein von oben**: Ein schmaler Verlauf über der Eingabezeile gibt der
+  Leiste Materialtiefe (Haarlinie oben, weicher Schattenhof darunter), ohne die
+  Fläche milchig zu machen.
+
+### Behoben
+
+- **Die Leiste schwebt nicht mehr vor den Einstellungen**: Öffnen sich die
+  Einstellungen (Befehl `/settings`, Tray oder `Strg+,`), zieht sich die Leiste
+  zurück — und holt sich dabei **keinen fremden Fokus** zurück. Vorher blieb sie
+  absichtlich stehen und nahm dem Einstellungsfenster sofort wieder die Tastatur.
+- **Hotkey bei offenen Einstellungen**: `Alt+Space` holt jetzt das
+  Einstellungsfenster nach vorn, statt die Leiste darüber zu legen.
+- **Ruckeln beim Schreiben**: Der Antwortbereich wird nur noch neu gesetzt, wenn
+  sich der Text wirklich geändert hat. Vorher wurden bis zu 14-mal je Sekunde
+  dieselben Absätze neu aufgebaut — das flackerte und kostete Leistung.
+- **Mittige Lage**: Die Leiste wurde beim ersten Öffnen nach der eingestellten
+  Startbreite (680) gesetzt statt nach der wirklich eingestellten Breite — nach
+  einer Breitenänderung saß sie nicht mehr mittig.
+- **Schriftgröße wirkt sofort**: Eine geänderte Schriftgröße erreichte den
+  bereits angezeigten Antworttext erst beim nächsten Zeichentakt; jetzt wird er
+  im selben Augenblick neu gesetzt.
+- **Meldungen ohne laufende Sitzung**: Die Messmodi (`--shot`, `--smoke`,
+  `--ask`, `--ask-ui`) laufen jetzt auch dann, wenn im Infobereich schon eine
+  Fassung wartet — vorher wurden sie wortlos dorthin abgeschoben.
+
+### Sicherheit
+
+- Selbsttest auf 48 Prüfungen erweitert: Bewegung (Zeiten, Kurve läuft von 0
+  nach 1 und nie zurück), das Zurücktreten der Leiste samt Grundstellung danach,
+  sofortiges Schließen ohne Bewegung und der Beweis, dass unveränderter
+  Antworttext nicht neu gezeichnet wird.
+
 ## [2.1.0] — 2026-10-14
 
 ### Neu
