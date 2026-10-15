@@ -43,10 +43,16 @@ jobs:
           # Trimmen unterstützt WPF/WinForms nicht (NETSDK1175) und kann Laufzeitcode entfernen.
           dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
 
-          # Ausgewertet wird über den Rückgabewert UND die Ergebniszeile —
-          # Begründung steht in der Datei selbst. Rückgabewert prüfen und
-          # weiterreichen: ohne das wäre der Schritt grün, auch wenn rot.
+          # Ausgewertet wird über den Rückgabewert UND die Ergebniszeile; die
+          # Begründung steht in der Datei selbst. Die EXE wird hier bewusst nicht
+          # direkt aufgerufen: als Fensterprogramm hängt sie sich an die Konsole
+          # des Aufrufers, schreibt dorthin und nichts in den Mitlesevorgang —
+          # ein leerer Mitlesevorgang sieht dann aus wie ein bestandener Lauf.
           & ./tools/verify-selftest.ps1 -Exe ./dist/publish/AIlight.exe
+
+          # Ohne diese zwei Zeilen wäre der Schritt grün, auch wenn der Selbsttest
+          # rot ist — und ein gescheiterter Aufruf (kein Rückgabewert) erst recht.
+          if ($null -eq $LASTEXITCODE) { Write-Host 'Selbsttest: kein Rückgabewert — der Aufruf ist nicht durchgelaufen.'; exit 1 }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test artifact

@@ -25,6 +25,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Jeder Weg endet mit einem Rückgabewert: 0 heißt grün, alles andere rot. Ein
+# Fehler, der ungefangen nach oben liefe, wäre für den CI-Schritt nicht von einem
+# Erfolg zu unterscheiden — und genau das darf nicht passieren.
+trap {
+    Write-Host "Selbsttest: unerwarteter Fehler — $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+
 $lines = @()
 $code = $ExitCode
 
@@ -33,8 +41,30 @@ if (-not [string]::IsNullOrWhiteSpace($Exe)) {
         throw "Selbsttest-EXE nicht gefunden: $Exe"
     }
 
-    $lines = @(& $Exe --selftest 2>&1)
-    $code = $LASTEXITCODE
+    # Voller Pfad: so hängt das Ergebnis nicht davon ab, aus welchem Verzeichnis
+    # der Aufruf kommt.
+    $exePath = (Resolve-Path -LiteralPath $Exe).ProviderPath
+    $exeDir = Split-Path -Parent $exePath
+
+    # Ein Fensterprogramm hängt sich an die Konsole des Aufrufers an
+    # (AttachConsole) und schreibt dann dorthin: bei einem direkten Aufruf
+    # („& $Exe“) geht die Ausgabe verloren, und ein leerer Mitlesevorgang sieht
+    # anschließend aus wie ein bestandener Lauf. Genau das hat den CI-Schritt
+    # grün gemeldet, obwohl nichts geprüft worden war. Deshalb der Weg über eine
+    # Datei — denselben nimmt build.ps1.
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ailight-selftest-' + [Guid]::NewGuid().ToString('N') + '.txt')
+    try {
+        $run = Start-Process -FilePath $exePath -WorkingDirectory $exeDir -ArgumentList '--selftest' `
+            -Wait -PassThru -RedirectStandardOutput $tmp
+        $code = $run.ExitCode
+        if (Test-Path -LiteralPath $tmp) {
+            $lines = @(Get-Content -LiteralPath $tmp -Encoding UTF8)
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+    }
+
     $lines | ForEach-Object { Write-Host $_ }
 }
 elseif (-not [string]::IsNullOrWhiteSpace($Log)) {
