@@ -26,6 +26,7 @@ public sealed class App : Application
     private SingleInstance? _single;
     private MainWindow? _bar;
     private SettingsWindow? _settings;
+    private WelcomeWindow? _welcome;
     private TrayIcon? _tray;
     private HotKey? _hotkey;
     private GroqClient? _client;
@@ -99,6 +100,10 @@ public sealed class App : Application
 
         Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
 
+        // Der Bewegungsschalter gilt für alle Fenster — deshalb steht er hier und
+        // nicht erst in der Leiste (die es in diesem Moment noch gar nicht gibt).
+        Motion.Enabled = Settings.AnimateBar;
+
         _client = new GroqClient();
         History = new HistoryStore(Paths.HistoryFile);
         Chat = new ChatService(_client, Settings, History);
@@ -135,7 +140,7 @@ public sealed class App : Application
                     + "sich die Leiste weiterhin öffnen; in den Einstellungen lässt sich ein anderer wählen.");
             }
 
-            ShowWelcomeWhenNoKey();
+            ShowWelcomeOnFirstStart();
             Trace("bereit");
         }));
 
@@ -177,6 +182,16 @@ public sealed class App : Application
             return;
         }
 
+        if (_options.Welcome)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                OpenWelcome();
+                Trace("einführung");
+            }));
+            return;
+        }
+
         if (Settings.PreloadBar)
         {
             // Erst nach dem Anmelden in Ruhe aufbauen: dann ist der erste Hotkey sofort da.
@@ -192,6 +207,40 @@ public sealed class App : Application
             Trace("leiste_gezeigt");
         }
 
+    }
+
+    /// <summary>
+    /// Läuft gerade ein Mess- oder Bildmodus? Dann öffnet sich kein Fenster, das
+    /// niemand angefordert hat — die Einführung würde sonst mitten in die
+    /// Aufnahmen platzen.
+    /// </summary>
+    private bool IsMeasurementMode
+        => _options.Shot.Length > 0
+           || _options.Ask.Length > 0
+           || _options.AskUi.Length > 0
+           || _options.SmokeSeconds > 0
+           || _options.SelfTest;
+
+    /// <summary>
+    /// Der erste Start nach der Installation: die Einführung öffnet sich und
+    /// erklärt alles — vom Schlüssel bis zum Hotkey. Ein zweites Mal kommt sie
+    /// nicht; wer sie nochmal sehen will, ruft sie über /welcome auf.
+    /// </summary>
+    private void ShowWelcomeOnFirstStart()
+    {
+        if (IsMeasurementMode)
+        {
+            return;
+        }
+
+        if (!Settings.WelcomeSeen)
+        {
+            Log.Info("Erster Start — die Einführung wird geöffnet");
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(OpenWelcome));
+            return;
+        }
+
+        ShowWelcomeWhenNoKey();
     }
 
     /// <summary>
@@ -211,8 +260,39 @@ public sealed class App : Application
             _tray?.ShowBalloon("AIlight",
                 "Fast fertig: Trage im Einstellungsfenster deinen Groq-Schlüssel ein "
                 + "(console.groq.com/keys) und klicke auf „Schlüssel testen“.");
-            OpenSettings();
+            OpenSettings("konto");
         }));
+    }
+
+    /// <summary>
+    /// Die Einführung öffnen — beim ersten Start, über /welcome, aus dem
+    /// Infobereich oder aus den Einstellungen. Die Leiste tritt dabei zurück,
+    /// wie vor den Einstellungen: sie schwebt sonst über allem anderen.
+    /// </summary>
+    public void OpenWelcome()
+    {
+        _bar?.YieldToSettings();
+
+        if (_welcome is null)
+        {
+            Log.Info("Einführung geöffnet");
+            _welcome = new WelcomeWindow(Settings, Chat);
+            _welcome.Closed += (_, _) =>
+            {
+                _welcome = null;
+                // Gesehen ist gesehen: sie soll nicht bei jedem Start wiederkommen.
+                Settings.WelcomeSeen = true;
+            };
+        }
+
+        _welcome.Show();
+        if (_welcome.WindowState == WindowState.Minimized)
+        {
+            _welcome.WindowState = WindowState.Normal;
+        }
+
+        _welcome.PlayEntrance();
+        _welcome.Activate();
     }
 
     /// <summary>Die Leiste bauen (oder zurückgeben) — ohne sie zu zeigen.</summary>
@@ -237,6 +317,18 @@ public sealed class App : Application
 
     public void ToggleBar()
     {
+        // Solange die Einführung offen ist, gehört sie nach vorn.
+        if (_welcome is { } welcome)
+        {
+            if (welcome.WindowState == WindowState.Minimized)
+            {
+                welcome.WindowState = WindowState.Normal;
+            }
+
+            welcome.Activate();
+            return;
+        }
+
         // Solange die Einstellungen offen sind, gehören sie nach vorn: Die Leiste
         // ist immer im Vordergrund und würde sonst davor schweben.
         if (_settings is { } open)
@@ -254,7 +346,11 @@ public sealed class App : Application
         bar.Toggle();
     }
 
-    public void OpenSettings()
+    /// <summary>
+    /// Einstellungen öffnen — ohne Bereich beim ersten Bereich, mit Bereich zum
+    /// Beispiel aus der Einführung heraus ("/welcome" → „Schlüssel eintragen“).
+    /// </summary>
+    public void OpenSettings(string area = "")
     {
         // Die Leiste tritt zurück, statt vor den Einstellungen zu schweben —
         // genau das war der störende Fall. Fokus holt sie sich dabei nicht
@@ -266,6 +362,11 @@ public sealed class App : Application
             Log.Info("Einstellungen geöffnet");
             _settings = new SettingsWindow(Settings, Chat);
             _settings.Closed += (_, _) => _settings = null;
+        }
+
+        if (area.Length > 0)
+        {
+            _settings.ShowArea(area);
         }
 
         _settings.Show();
@@ -304,11 +405,16 @@ public sealed class App : Application
                 _bar?.ApplySettings();
                 break;
 
+            case nameof(AppSettings.AnimateBar):
+                // Gilt für jedes Fenster — auch für das, das gerade offen ist.
+                Motion.Enabled = Settings.AnimateBar;
+                _bar?.ApplySettings();
+                break;
+
             case nameof(AppSettings.WindowWidth):
             case nameof(AppSettings.TopPercent):
             case nameof(AppSettings.FontSize):
             case nameof(AppSettings.MaxSuggestions):
-            case nameof(AppSettings.AnimateBar):
             case nameof(AppSettings.ShowThinking):
             case nameof(AppSettings.ShowMeta):
                 _bar?.ApplySettings();
@@ -330,7 +436,7 @@ public sealed class App : Application
             _tray = new TrayIcon(_trayIconImage, $"AIlight {Settings.Hotkey} — fragen, Enter");
             _tray.Activated += ShowBar;
             _tray.AddItem("Leiste zeigen", ShowBar);
-            _tray.AddItem("Einstellungen …", OpenSettings);
+            _tray.AddItem("Einstellungen …", () => OpenSettings());
             _tray.AddItem("Neues Gespräch", () =>
             {
                 Chat.NewChat();
@@ -341,6 +447,7 @@ public sealed class App : Application
                 ShowBar();
                 EnsureBar().ShowHistoryFromTray();
             });
+            _tray.AddItem("Einführung …", OpenWelcome);
             _tray.AddSeparator();
             var item = _tray.AddCheck("Mit Windows starten", Settings.StartWithWindows, value => Settings.StartWithWindows = value);
             _autostartItem = new ToolStripMenuItemHost(item);
@@ -601,6 +708,15 @@ public sealed class App : Application
 
         Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
 
+        // Die Einführung: alle sieben Schritte dunkel, der erste auch hell.
+        foreach (var step in new[] { "willkommen", "schluessel", "hotkey", "fragen", "befehle", "aussehen", "fertig" })
+        {
+            SaveWelcomeShot(folder, "dunkel", step);
+        }
+
+        SaveWelcomeShot(folder, "hell", "willkommen");
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
+
         SaveBarShot(folder, "leiste-vorschlaege.png", "", "", "");
         SaveBarShot(
             folder,
@@ -624,6 +740,17 @@ public sealed class App : Application
             window,
             Path.Combine(folder, $"einstellungen-{theme}-{area}.png"),
             () => window.SelectAreaForTest(area));
+    }
+
+    /// <summary>Ein Bild der Einführung in einer Farbstimmung und einem Schritt.</summary>
+    private void SaveWelcomeShot(string folder, string theme, string step)
+    {
+        Theme.Apply(theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
+        var window = new WelcomeWindow(Settings, Chat);
+        Shot.SaveWindow(
+            window,
+            Path.Combine(folder, $"einfuehrung-{theme}-{step}.png"),
+            () => window.GoToStepForTest(step));
     }
 
     /// <summary>Die Leiste ohne Fenster messen und zeichnen — so blitzt nichts auf.</summary>

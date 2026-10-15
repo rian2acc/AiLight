@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using AIlight.Core;
 using AIlight.Groq;
 using AIlight.Views;
@@ -50,7 +52,9 @@ public static class SelfTest
         TestSuggestions();
         TestMotion();
         TestUserInterface();
-        // Die Marke liegt in den Themen-Ressourcen — deshalb erst hier.
+        // Alles, was die geladenen Themen-Ressourcen braucht, kommt danach:
+        // die Übergänge des Aufbaus und die Marke.
+        TestBuildMotion();
         TestMark();
 
         Console.WriteLine(new string('-', 60));
@@ -75,6 +79,13 @@ public static class SelfTest
         {
             Failures.Add($"{name} — {ex.GetType().Name}: {ex.Message}");
             Console.WriteLine($"[ROT ] {name} — {ex.Message}");
+            foreach (var line in (ex.StackTrace ?? "").Split('\n')
+                .Select(part => part.Trim())
+                .Where(part => part.StartsWith("at ", StringComparison.Ordinal))
+                .Take(3))
+            {
+                Console.WriteLine("       " + line);
+            }
         }
     }
 
@@ -558,6 +569,101 @@ public static class SelfTest
 
     // ── Bewegung ────────────────────────────────────────────────────────────
 
+    /// <summary>Wartet, bis eine Bedingung wirklich gilt (höchstens zwei Sekunden).</summary>
+    private static bool WaitFor(DispatcherObject target, Func<bool> condition, int milliseconds = 2000)
+    {
+        var deadline = DateTime.Now.AddMilliseconds(milliseconds);
+        while (DateTime.Now < deadline)
+        {
+            // Settle lässt den Nachrichtenumlauf arbeiten: nur so kommen Zeitgeber
+            // und Animationen überhaupt voran.
+            Shot.Settle(target);
+            if (condition())
+            {
+                return true;
+            }
+
+            System.Threading.Thread.Sleep(20);
+        }
+
+        Shot.Settle(target);
+        return condition();
+    }
+
+    /// <summary>
+    /// Alle Übergänge einer Gestaltungsvorlage — aus der Vorlage selbst und aus
+    /// den Auslösern des Stils (beide Wege kommen im Aufbau vor).
+    /// </summary>
+    private static List<DoubleAnimation> AnimationsIn(object resource)
+    {
+        var found = new List<DoubleAnimation>();
+        switch (resource)
+        {
+            case Style style:
+                foreach (var trigger in style.Triggers)
+                {
+                    Collect(trigger, found);
+                }
+
+                var template = style.Setters
+                    .OfType<Setter>()
+                    .FirstOrDefault(setter => setter.Property == Control.TemplateProperty)?.Value;
+                if (template is ControlTemplate fromStyle)
+                {
+                    foreach (var trigger in fromStyle.Triggers)
+                    {
+                        Collect(trigger, found);
+                    }
+                }
+
+                break;
+
+            case ControlTemplate direct:
+                foreach (var trigger in direct.Triggers)
+                {
+                    Collect(trigger, found);
+                }
+
+                break;
+        }
+
+        return found;
+    }
+
+    private static void Collect(TriggerBase trigger, List<DoubleAnimation> found)
+    {
+        if (trigger is not Trigger typed)
+        {
+            return;
+        }
+
+        foreach (TriggerAction action in typed.EnterActions)
+        {
+            Collect(action as BeginStoryboard, found);
+        }
+
+        foreach (TriggerAction action in typed.ExitActions)
+        {
+            Collect(action as BeginStoryboard, found);
+        }
+    }
+
+    private static void Collect(BeginStoryboard? begin, List<DoubleAnimation> found)
+    {
+        if (begin?.Storyboard is not { } storyboard)
+        {
+            return;
+        }
+
+        foreach (var child in storyboard.Children)
+        {
+            if (child is DoubleAnimation animation)
+            {
+                found.Add(animation);
+            }
+        }
+    }
+
     private static void TestMotion()
     {
         Check("Bewegung: kurze Zeiten, weiche Kurve", () =>
@@ -593,6 +699,151 @@ public static class SelfTest
             True(Motion.PageMs > Motion.QuickMs && Motion.PageMs <= 400,
                 $"Der Seitenwechsel ist unpassend getaktet: {Motion.PageMs} ms");
             True(Motion.PageRise > 0 && Motion.PageRise <= 16, "Der Auftrieb der Seite ist zu groß");
+        });
+
+        Check("Bewegung: die Hauskurve ist die steile macOS-Kurve, ohne Überschwingen", () =>
+        {
+            // Eine Kurve mit flachem Anfang wirkt zäh, eine mit Überschwingen
+            // wirkt billig. Diese Werte sind die Hausordnung.
+            var house = Motion.Soft as CubicBezierEase;
+            True(house is not null, "Die Hauskurve ist keine kubische Bézier-Kurve");
+            Equal(0.32, house!.X1, "Stützpunkt X1");
+            Equal(0.72, house.Y1, "Stützpunkt Y1");
+            Equal(0d, house.X2, "Stützpunkt X2");
+            Equal(1d, house.Y2, "Stützpunkt Y2");
+
+            // Steil los, dann langer Auslauf: nach der Hälfte der Zeit ist fast
+            // alles unterwegs — genau das lässt eine Bewegung „flüssig“ aussehen.
+            True(Motion.Ease(0.5) > 0.85, $"Die Kurve ist zu zahm: {Motion.Ease(0.5):0.00}");
+
+            for (var step = 0; step <= 40; step++)
+            {
+                var value = Motion.Ease(step / 40.0);
+                True(value >= -1e-9 && value <= 1 + 1e-9, $"Die Kurve verlässt 0…1 bei {step}/40: {value}");
+            }
+
+            // Die Rechnung selbst: Endpunkte sitzen genau, Mitte dazwischen.
+            Equal(0d, CubicBezierEase.Solve(0, 0.32, 0.72, 0, 1), "Kurve am Anfang");
+            Equal(1d, CubicBezierEase.Solve(1, 0.32, 0.72, 0, 1), "Kurve am Ende");
+            True(CubicBezierEase.Solve(0.5, 0.32, 0.72, 0, 1) > 0.5, "Kurve in der Mitte");
+        });
+
+        Check("Bewegung: der Schalter von Windows wird beachtet", () =>
+        {
+            var wasEnabled = Motion.Enabled;
+            var wasFollowing = Motion.FollowSystem;
+            try
+            {
+                Motion.Enabled = false;
+                True(!Motion.Moves, "Ohne Bewegung darf nichts laufen");
+                Equal(false, Anim.On, "Auch die Übergänge müssen stehen");
+
+                Motion.Enabled = true;
+                Motion.FollowSystem = false;
+                True(Motion.Moves, "Mit Hausschalter muss Bewegung laufen, egal was Windows sagt");
+
+                Motion.FollowSystem = true;
+                Equal(Motion.SystemAllows, Motion.Moves, "Der Systemschalter wird nicht beachtet");
+            }
+            finally
+            {
+                Motion.Enabled = wasEnabled;
+                Motion.FollowSystem = wasFollowing;
+            }
+        });
+
+        Check("Bewegung: ohne Bewegung springt das Scrollen sofort ans Ziel", () =>
+        {
+            var view = new ScrollViewer { Height = 60, Width = 300 };
+            var content = new StackPanel();
+            for (var line = 0; line < 60; line++)
+            {
+                content.Children.Add(new TextBlock { Text = $"Zeile {line}", Height = 20 });
+            }
+
+            view.Content = content;
+
+            // Ein echtes (aber verstecktes) Fenster: nur darin hat ein Scrollbereich
+            // wirklich eine Länge, an die man springen kann.
+            var window = new Window { Width = 300, Height = 60, ShowInTaskbar = false, Content = view };
+            Shot.Show(window);
+            var glide = new Glide(view);
+
+            var wasEnabled = Motion.Enabled;
+            try
+            {
+                Equal(60d, view.ViewportHeight, "Sichtbare Höhe des Bereichs");
+                True(view.ScrollableHeight > 300, $"Zu wenig Inhalt zum Scrollen: {view.ScrollableHeight}");
+
+                Motion.Enabled = false;
+                glide.To(300);
+                True(!glide.IsRunning, "Ohne Bewegung darf kein Zeichentakt laufen");
+
+                // Eine neue Scrollposition wirkt beim nächsten Anordnen — deshalb
+                // erst anordnen, dann messen.
+                Shot.Settle(window);
+                view.UpdateLayout();
+                Equal(300d, Math.Round(view.VerticalOffset), "Der Sprung ging nicht ans Ziel");
+
+                // Nachziehen ohne Bewegung: es springt ans Ende, statt gar nichts zu tun.
+                glide.Chase();
+                True(!glide.IsRunning, "Auch das Nachziehen darf ohne Bewegung nicht laufen");
+                Shot.Settle(window);
+                view.UpdateLayout();
+                Equal(view.ScrollableHeight, view.VerticalOffset, "Das Nachziehen blieb am alten Platz stehen");
+            }
+            finally
+            {
+                Motion.Enabled = wasEnabled;
+                glide.Dispose();
+                window.Close();
+            }
+        });
+    }
+
+    // ── Bewegung im Aufbau ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Die Übergänge in <c>Views/Theme.xaml</c> — sie tragen den größten Teil des
+    /// Gefühls (Hover, Drücken, Auswahl). Geprüft wird deshalb nicht „sieht gut
+    /// aus“, sondern: jede Bewegung hat eine Kurve und eine Dauer aus dem Haus.
+    /// Ohne Kurve liefe sie linear, und genau das wirkt hart.
+    /// </summary>
+    private static void TestBuildMotion()
+    {
+        Check("Bewegung: die Übergänge im Aufbau benutzen dieselben Kurven und Zeiten", () =>
+        {
+            var resources = Application.Current.Resources;
+            var curve = resources["Ease.Out"] as CubicBezierEase;
+            True(curve is not null, "Die Kurve „Ease.Out“ fehlt im Aufbau");
+            Equal(((CubicBezierEase)Motion.Out).X1, curve!.X1, "Stützpunkt der Hauskurve im Aufbau");
+            Equal(((CubicBezierEase)Motion.Out).Y1, curve.Y1, "Stützpunkt der Hauskurve im Aufbau");
+
+            var allowed = new[] { Motion.PressMs, Motion.QuickMs, Motion.LeaveMs, Motion.PageMs };
+            var seen = 0;
+            foreach (var key in new[]
+                     {
+                         "Button.Ghost", "Button.Primary", "Nav.Item", "Switch", "Swatch",
+                         "Chrome.Button", "Suggest.Row", "Slider.Slim",
+                     })
+            {
+                if (resources[key] is not { } resource)
+                {
+                    continue;
+                }
+
+                foreach (var animation in AnimationsIn(resource))
+                {
+                    seen++;
+                    True(animation.EasingFunction is CubicBezierEase,
+                        $"Ein Übergang in „{key}“ läuft ohne Kurve (linear)");
+                    var milliseconds = (int)Math.Round(animation.Duration.TimeSpan.TotalMilliseconds);
+                    True(allowed.Contains(milliseconds),
+                        $"Unpassende Dauer in „{key}“: {milliseconds} ms");
+                }
+            }
+
+            True(seen >= 20, $"Zu wenige Übergänge gefunden: {seen}");
         });
     }
 
@@ -726,6 +977,12 @@ public static class SelfTest
                 Equal(GroqModels.Small.Id, settings.Model, "Modell aus dem Fenster");
                 window.ApplySliderForTest("WidthSlider", 900);
                 Equal(900d, settings.WindowWidth, "Breite aus dem Fenster");
+
+                // Die Einführung lässt sich aus den Einstellungen erneut öffnen.
+                window.SelectAreaForTest("verhalten");
+                var welcomeButton = (Button)window.FindName("WelcomeButton")!;
+                True(welcomeButton.IsEnabled && (string)welcomeButton.Content == "Einführung anzeigen",
+                    "Der Knopf für die Einführung fehlt in den Einstellungen");
 
                 // Bereiche: links wählen, rechts erscheint genau eine Seite.
                 True(window.AreaKeysForTest.Count >= 7, $"zu wenige Bereiche: {window.AreaKeysForTest.Count}");
@@ -1048,6 +1305,135 @@ public static class SelfTest
             Theme.Apply("dunkel", "#4C8DFF", 1.0);
             var dark = ((SolidColorBrush)Application.Current.Resources["Brush.Text"]).Color;
             True(light != dark, "beide Themen zeigen dieselbe Textfarbe");
+        });
+
+        Check("Oberfläche: nach einer Frage verschwinden die Vorschläge, beim Tippen kommen sie zurück", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-ask-").FullName;
+            try
+            {
+                var settings = new AppSettings { MaxSuggestions = 6 };
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                history.Add(new HistoryEntry("h-1", DateTimeOffset.Now, "Was ist Strom?",
+                    "Bewegte Ladung", GroqModels.Small.Id, 1, 1, 0));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+
+                // Ein echtes (aber verstecktes) Fenster: nur dort läuft Bewegung.
+                Shot.Show(bar);
+                bar.ApplySettings();
+                True(bar.SuggestionCount > 0, "keine Vorschläge aufgebaut");
+                True(WaitFor(bar, () => bar.SuggestionsVisibleForTest), "die Vorschläge standen nicht im Bild");
+
+                // Die Frage: das Feld wird leer, die Vorschläge klappen weg.
+                bar.BeginAskForTest("Was ist Strom?");
+                True(bar.AnsweringForTest, "die Frage wurde nicht begonnen");
+                Equal("", bar.InputTextForTest, "das Eingabefeld wurde nicht geleert");
+                True(WaitFor(bar, () => !bar.SuggestionsVisibleForTest),
+                    "die Vorschläge stehen weiter im Bild, obwohl eine Frage läuft");
+                Equal(0, bar.AnswerTextForTest.Length, "es steht schon eine Antwort da");
+
+                // Wer tippt, sucht etwas — dann gehören sie zurück ins Bild.
+                bar.SetInputForTest("Was");
+                True(bar.SuggestionsVisibleForTest, "beim Tippen kamen die Vorschläge nicht zurück");
+
+                // Feld wieder leer: es bleibt das Gespräch stehen, sonst nichts.
+                bar.SetInputForTest("");
+                True(WaitFor(bar, () => !bar.SuggestionsVisibleForTest),
+                    "bei leerem Feld stehen die Vorschläge wieder da");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Einführung: sieben Schritte, Blättern, Vorführung und Marke", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-tour-").FullName;
+            try
+            {
+                var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var welcome = new WelcomeWindow(settings, chat);
+
+                Equal(7, welcome.StepKeysForTest.Count, "Schritte der Einführung");
+                Equal("willkommen", welcome.VisibleStepForTest, "erster Schritt");
+                True(!welcome.BackEnabledForTest, "„Zurück“ ist im ersten Schritt aktiv");
+                Equal("Weiter", welcome.NextLabelForTest, "Beschriftung am Anfang");
+
+                // Die Befehlsliste kommt aus der Quelle — jeder Befehl steht drin.
+                foreach (var command in Commands.All)
+                {
+                    True(welcome.CommandNamesForTest.Any(name => name.Contains("/" + command.Name, StringComparison.Ordinal)),
+                        $"Befehl fehlt in der Einführung: {command.Name}");
+                }
+
+                welcome.NextForTest();
+                Equal("schluessel", welcome.VisibleStepForTest, "zweiter Schritt");
+                True(welcome.IsStepVisibleForTest("schluessel"), "die Seite „Schlüssel“ ist nicht sichtbar");
+                True(!welcome.IsStepVisibleForTest("willkommen"), "die alte Seite blieb sichtbar");
+                True(welcome.BackEnabledForTest, "„Zurück“ ist im zweiten Schritt aus");
+
+                welcome.GoToStepForTest("fertig");
+                Equal("Fertig", welcome.NextLabelForTest, "Beschriftung am Ende");
+                welcome.BackForTest();
+                Equal("aussehen", welcome.VisibleStepForTest, "ein Schritt zurück");
+
+                // Im Fenster: die Vorführung läuft und tippt wirklich.
+                Shot.Show(welcome);
+                welcome.GoToStepForTest("fragen");
+                True(welcome.DemoRunningForTest, "die Vorführung läuft nicht");
+                welcome.DemoStepForTest();
+                True(welcome.DemoQuestionForTest.Length > 0, "die Vorführung tippt nicht");
+
+                // Der Weiter-Knopf sitzt vollständig im Fenster — nichts abgeschnitten.
+                var next = (Button)welcome.FindName("NextButton")!;
+                var corner = next.TransformToAncestor(welcome).Transform(new Point(next.ActualWidth, next.ActualHeight));
+                True(corner.X <= welcome.ActualWidth + 1 && corner.Y <= welcome.ActualHeight + 1,
+                    $"Der „Weiter“-Knopf ragt aus dem Fenster: {corner}");
+
+                // Die Marke steht auch hier: der Lichtpunkt trifft den Akzent.
+                var root = (FrameworkElement)welcome.Content;
+                var mark = welcome.MarkForTest;
+                var accent = ((SolidColorBrush)Application.Current.Resources["Brush.Accent"]).Color;
+                var point = InBitmap(root, mark, mark.ActualWidth / 2, mark.ActualHeight * 0.14);
+                var light = Shot.PixelAt(root, point.X, point.Y);
+                True(Near(light, accent), $"Der Lichtpunkt der Marke fehlt in der Einführung: {light}");
+
+                var beside = InBitmap(root, mark, mark.ActualWidth * 0.18, mark.ActualHeight * 0.42);
+                var empty = Shot.PixelAt(root, beside.X, beside.Y);
+                True(!Near(empty, accent), $"Neben der Marke steht auch Akzentfarbe: {empty}");
+
+                welcome.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Einführung: einmal gesehen bleibt gesehen", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-seen-").FullName;
+            try
+            {
+                var file = Path.Combine(folder, "settings.json");
+                var settings = AppSettings.Load(file);
+                True(!settings.WelcomeSeen, "die Einführung käme ungefragt immer wieder");
+
+                // Beim Schließen setzt das Programm diesen Vermerk — hier wird
+                // geprüft, dass er wirklich in der Datei landet.
+                settings.WelcomeSeen = true;
+                True(AppSettings.Load(file).WelcomeSeen, "der Vermerk wurde nicht gespeichert");
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
         });
 
         Check("Symbol: das Infobereich-Symbol lädt (Datei oder eingebettet)", () =>

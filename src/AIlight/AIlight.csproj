@@ -13,10 +13,18 @@
     <LangVersion>12</LangVersion>
     <AssemblyName>AIlight</AssemblyName>
     <RootNamespace>AIlight</RootNamespace>
-    <Version>2.3.0</Version>
+    <Version>2.4.0</Version>
     <Company>AIlight</Company>
     <Product>AIlight</Product>
     <Description>KI-Leiste für Windows — Hotkey, Frage, gestreamte Antwort</Description>
+    <!-- Vollständige Angaben in der Datei: Windows, Virenschutz-Programme und die
+         Dateieigenschaften lesen sie. Ein Programm ohne Hersteller und Copyright
+         sieht für eine Heuristik namenloser aus als eines mit. -->
+    <Copyright>Copyright (C) 2026 AIlight</Copyright>
+    <Authors>rian2acc</Authors>
+    <PackageProjectUrl>https://github.com/rian2acc/AiLight</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rian2acc/AiLight</RepositoryUrl>
+    <NeutralLanguage>de</NeutralLanguage>
     <ApplicationIcon>..\..\packaging\ailight.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <InvariantGlobalization>false</InvariantGlobalization>

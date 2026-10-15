@@ -11,8 +11,8 @@ on:
 env:
   DOTNET_VERSION: '8.0.x'
 
-# Der Veröffentlichungs-Schritt hängt den Installer an das Release — dafür
-# braucht das automatische Token Schreibrechte auf den Inhalt des Repos.
+# Der Veröffentlichungs-Schritt hängt Installer, ZIP und Prüfsummen an das
+# Release — dafür braucht das automatische Token Schreibrechte auf den Inhalt.
 permissions:
   contents: write
 
@@ -37,7 +37,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build src/AIlight/AIlight.csproj -c Release --no-restore
 
-      - name: Run Self-Test (52 assertions)
+      - name: Run Self-Test (59 assertions)
         run: |
           # Gleicher Publish wie tools/build.ps1: self-contained, ohne Trimmen —
           # Trimmen unterstützt WPF/WinForms nicht (NETSDK1175) und kann Laufzeitcode entfernen.
@@ -92,15 +92,53 @@ jobs:
           dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
           & $env:ISCC packaging/ailight.iss
 
+      # Signieren nur, wenn ein Zertifikat als Repository-Geheimnis hinterlegt ist
+      # (SIGNING_PFX_BASE64 + SIGNING_PFX_PASSWORD). Ohne Geheimnis läuft der
+      # Schritt nicht — der Installer ist dann unsigniert, siehe docs/signieren.md.
+      - name: Sign (optional)
+        if: ${{ secrets.SIGNING_PFX_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String("${{ secrets.SIGNING_PFX_BASE64 }}"))
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          foreach ($file in @('dist\publish\AIlight.exe', 'dist\installer\AIlightSetup.exe')) {
+            & $signtool sign /f $pfx /p "${{ secrets.SIGNING_PFX_PASSWORD }}" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $file
+            if ($LASTEXITCODE -ne 0) { throw "Signieren fehlgeschlagen: $file" }
+            Write-Host "signiert: $file"
+          }
+
+      # Die Portable-Fassung enthält dasselbe Programm ohne Installer: wer bei
+      # seinem Virenschutz aneckt, kann sie einfach entpacken und starten.
+      - name: Portable copy and checksums
+        shell: pwsh
+        run: |
+          $zip = 'dist\installer\AIlightPortable.zip'
+          Compress-Archive -Path 'dist\publish\*' -DestinationPath $zip -CompressionLevel Optimal -Force
+          $lines = @()
+          foreach ($file in @('dist\installer\AIlightSetup.exe', $zip)) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $lines += "$hash  $(Split-Path -Leaf $file)"
+            Write-Host ("{0}  {1}" -f $hash, (Split-Path -Leaf $file))
+          }
+          [IO.File]::WriteAllText('dist\installer\SHA256SUMS.txt', ($lines -join "`n") + "`n")
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: AIlightSetup
-          path: dist/installer/AIlightSetup.exe
+          path: |
+            dist/installer/AIlightSetup.exe
+            dist/installer/AIlightPortable.zip
+            dist/installer/SHA256SUMS.txt
           retention-days: 30
 
       - name: Attach to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/installer/AIlightSetup.exe
+          files: |
+            dist/installer/AIlightSetup.exe
+            dist/installer/AIlightPortable.zip
+            dist/installer/SHA256SUMS.txt

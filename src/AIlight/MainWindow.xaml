@@ -86,6 +86,8 @@
                                 FontSize="17"
                                 Foreground="{DynamicResource Brush.Text}"
                                 SelectionBrush="{DynamicResource Brush.Accent}"
+                                GotKeyboardFocus="OnInputFocusChanged"
+                                LostKeyboardFocus="OnInputFocusChanged"
                                 SpellCheck.IsEnabled="False"
                                 TextChanged="OnInputChanged"
                                 VerticalContentAlignment="Center" />
@@ -99,18 +101,59 @@
                                 VerticalAlignment="Center" />
                         </Grid>
 
+                        <!--
+                          Fokuslinie: ein Hauch Akzent unter der Eingabezeile, der
+                          aus der Mitte aufwächst, sobald das Feld die Tastatur hat.
+                          Das ist die leiseste Art zu sagen: „hier tippst du“.  
+                        -->
+                        <Border
+                            x:Name="FocusLine"
+                            Grid.ColumnSpan="3"
+                            Height="1.5"
+                            Margin="54,0,0,0"
+                            VerticalAlignment="Bottom"
+                            Background="{DynamicResource Brush.Accent}"
+                            Opacity="0"
+                            RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="FocusScale" ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
+
                         <StackPanel
                             Grid.Column="2"
                             Margin="8,0,14,0"
                             VerticalAlignment="Center"
                             Orientation="Horizontal">
-                            <TextBlock
+                            <!--
+                              Drei Punkte, die der Reihe nach aufleuchten, solange eine
+                              Antwort läuft. Ein einzelner Punkt sagte nur „irgendwas
+                              läuft“; drei Punkte mit Abstand erzählen „ich denke“.  
+                            -->
+                            <StackPanel
                                 x:Name="Spinner"
-                                Margin="0,0,8,0"
-                                FontSize="14"
-                                Foreground="{DynamicResource Brush.Accent}"
-                                Text="●"
-                                Visibility="Collapsed" />
+                                Margin="0,0,7,0"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Visibility="Collapsed">
+                                <Ellipse
+                                    x:Name="Dot1"
+                                    Width="5"
+                                    Height="5"
+                                    Margin="0,0,3,0"
+                                    Fill="{DynamicResource Brush.Accent}" />
+                                <Ellipse
+                                    x:Name="Dot2"
+                                    Width="5"
+                                    Height="5"
+                                    Margin="0,0,3,0"
+                                    Fill="{DynamicResource Brush.Accent}" />
+                                <Ellipse
+                                    x:Name="Dot3"
+                                    Width="5"
+                                    Height="5"
+                                    Fill="{DynamicResource Brush.Accent}" />
+                            </StackPanel>
                             <Button
                                 x:Name="StopButton"
                                 Click="OnStopClicked"
@@ -120,6 +163,15 @@
                         </StackPanel>
                     </Grid>
 
+                    <!--
+                      ── Vorschläge ────────────────────────────────────────
+                      Der ganze Bereich kann zu- und aufklappen: Wird eine Frage
+                      abgeschickt, verschwindet er und es bleibt nur das Gespräch
+                      stehen. Deshalb liegt er in einem eigenen Rahmen, dessen
+                      Höhe bewegt wird — die Trennlinie gehört dazu.
+                    -->
+                    <Grid x:Name="SuggestionBox" ClipToBounds="True" Visibility="Collapsed">
+                    <StackPanel>
                     <!--  Trennlinie: nur da, wenn Vorschläge da sind  -->
                     <Border Height="1" Background="{DynamicResource Brush.Separator}">
                         <Border.Style>
@@ -134,7 +186,6 @@
                         </Border.Style>
                     </Border>
 
-                    <!--  ── Vorschläge  ─────────────────────────────────────────  -->
                     <ScrollViewer
                         x:Name="SuggestionScroll"
                         MaxHeight="312"
@@ -236,6 +287,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    </StackPanel>
+                    </Grid>
 
                     <!--  Denk-Schritte (eingeklappt, nur wenn vorhanden)  -->
                     <Border

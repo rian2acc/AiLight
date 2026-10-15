@@ -7,10 +7,30 @@
 ; Bauen:
 ;   ISCC.exe packaging\ailight.iss
 ; Erwartet dist\publish (dotnet publish, siehe build.ps1).
+;
+; ── Wenn der Virenschutz meckert ─────────────────────────────────────────────
+; Der Installer ist nicht signiert. Manche Virenschutz-Programme stufen eine
+; unbekannte, frisch gebaute Setup-Datei deshalb als verdächtig ein — das ist
+; eine Heuristik, kein Befund. Was dagegen hilft, steht in docs/signieren.md:
+; in Kurzform
+;
+;   1. signieren (der Haken unten, siehe #ifdef SIGN) — das ist die einzige
+;      echte Abhilfe; eine Prüfsumme oder ein paar Metadaten ändern daran nichts,
+;   2. eine Falschmeldung melden (Microsoft und McAfee haben dafür Formulare),
+;   3. solange nichts signiert ist: die Portable-Fassung als ZIP anbieten, die
+;      ohne Installer auskommt (build.ps1 -Portable).
+;
+; Zur Verdichtung: "lzma2/ultra64" wurde hier durch "lzma2/max" ersetzt — die
+; Stufe, die Inno Setup selbst vorschlägt. Ein einzelnes Einstellungsfeld ist
+; keine belegte Lösung für Fehlalarme; es macht den Installer aber weniger
+; auffällig und schneller entpackbar.
 
 #define AppName "AIlight"
-#define AppVersion "2.3.0"
+#define AppVersion "2.4.0"
 #define AppPublisher "AIlight"
+#define AppPublisherUrl "https://github.com/rian2acc/AiLight"
+#define AppSupportUrl "https://github.com/rian2acc/AiLight/issues"
+#define AppUpdatesUrl "https://github.com/rian2acc/AiLight/releases/latest"
 #define AppExe "AIlight.exe"
 #define SourceDir "..\dist\publish"
 
@@ -20,6 +40,14 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
+AppPublisherURL={#AppPublisherUrl}
+AppSupportURL={#AppSupportUrl}
+AppUpdatesURL={#AppUpdatesUrl}
+AppCopyright=Copyright (C) 2026 {#AppPublisher}
+VersionInfoCompany={#AppPublisher}
+VersionInfoDescription={#AppName} Setup — KI-Leiste für Windows
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}
 DefaultDirName={localappdata}\{#AppName}
 DefaultGroupName={#AppName}
@@ -37,9 +65,23 @@ OutputBaseFilename=AIlightSetup
 SetupIconFile=ailight.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
-Compression=lzma2/ultra64
+; Verdichtung: die mittlere Stufe von Inno Setup. "ultra64" presste zwar noch
+; etwas kleiner, kostete aber beim Entpacken viel Arbeitsspeicher und Zeit —
+; und je stärker gepackt ein unbekanntes Setup aussieht, desto eher greifen
+; Heuristiken zu.
+#ifdef NoCompression
+Compression=none
+#else
+Compression=lzma2/max
+#endif
 SolidCompression=yes
 WizardStyle=modern
+; Wird nur gesetzt, wenn mit /DSIGN gebaut wird (siehe tools/build.ps1 -Sign).
+; Dann signiert Inno Setup auch den Deinstaller.
+#ifdef SIGN
+SignTool=signtool
+SignedUninstaller=yes
+#endif
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible

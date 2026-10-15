@@ -19,6 +19,13 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _preloadBar = true;
     private bool _hideOnLostFocus = true;
 
+    /// <summary>
+    /// Wurde die Einführung schon gezeigt? Sie läuft genau einmal — danach ist
+    /// sie über /welcome jederzeit wieder aufrufbar. Deshalb steht sie hier und
+    /// nicht im Programm: Ein Neuinstallieren soll sie nicht erneut aufzwingen.
+    /// </summary>
+    private bool _welcomeSeen;
+
     // ── Modell ───────────────────────────────────────────────────────────────
     private string _model = "auto";
     private string _answerLength = "mittel";
@@ -73,6 +80,7 @@ public sealed class AppSettings : INotifyPropertyChanged
 
     public string Hotkey { get => _hotkey; set => Set(ref _hotkey, value); }
     public bool StartWithWindows { get => _startWithWindows; set => Set(ref _startWithWindows, value); }
+    public bool WelcomeSeen { get => _welcomeSeen; set => Set(ref _welcomeSeen, value); }
     public bool PreloadBar { get => _preloadBar; set => Set(ref _preloadBar, value); }
     public bool HideOnLostFocus { get => _hideOnLostFocus; set => Set(ref _hideOnLostFocus, value); }
 

@@ -31,8 +31,11 @@ public partial class SettingsWindow : Window
     private bool _keyShownOnce;
     private string _page = "konto";
 
-    /// <summary>Die Akzentfarben von macOS — von Blau bis Graphit.</summary>
-    private static readonly (string Label, string Hex)[] Accents =
+    /// <summary>
+    /// Die Akzentfarben von macOS — von Blau bis Graphit. Die Einführung zeigt
+    /// dieselbe Liste, damit beide Fenster nicht auseinanderlaufen können.
+    /// </summary>
+    internal static readonly (string Label, string Hex)[] Accents =
     {
         ("Blau", "#0A84FF"),
         ("Türkis", "#64D2FF"),
@@ -105,6 +108,9 @@ public partial class SettingsWindow : Window
     internal FrameworkElement PreviewForTest => PreviewCard;
 
     internal void SelectAreaForTest(string key) => ShowPage(key);
+
+    /// <summary>Von außen auf einen Bereich springen (z. B. aus der Einführung).</summary>
+    public void ShowArea(string key) => ShowPage(key);
 
     /// <summary>Deckkraft des ganzen Fensters (Prüfstand: Auftritt und Grundstellung).</summary>
     internal double RootOpacityForTest => Root.Opacity;
@@ -611,6 +617,10 @@ public partial class SettingsWindow : Window
 
     private void OnOpenRepo(object sender, RoutedEventArgs e)
         => Open("https://github.com/rian2acc/AiLight");
+
+    /// <summary>Die Einführung erneut zeigen — ohne die Einstellungen zu schließen.</summary>
+    private void OnOpenWelcome(object sender, RoutedEventArgs e)
+        => (Application.Current as App)?.OpenWelcome();
 
     private void OnOpenLog(object sender, RoutedEventArgs e)
     {

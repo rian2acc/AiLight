@@ -435,6 +435,26 @@
                                         </WrapPanel>
                                     </StackPanel>
                                 </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock
+                                            Margin="0,2,0,8"
+                                            Style="{StaticResource Title}"
+                                            Text="Einführung" />
+                                        <TextBlock
+                                            Margin="0,0,0,12"
+                                            Style="{StaticResource Subtitle}"
+                                            Text="Die Einführung mit den sieben Schritten läuft beim ersten Start einmal von selbst. Hier lässt sie sich jederzeit wieder ansehen." />
+                                        <WrapPanel>
+                                            <Button
+                                                x:Name="WelcomeButton"
+                                                Click="OnOpenWelcome"
+                                                Content="Einführung anzeigen"
+                                                Style="{StaticResource Button.Ghost}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
 
                             <!--  ══ Aussehen ═══════════════════════════════  -->

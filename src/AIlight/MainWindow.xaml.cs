@@ -60,6 +60,12 @@ public partial class MainWindow : Window
     private Glide? _rowGlide;
     private bool _followAnswer;
     private bool _hiding;
+    /// <summary>Zwischen der Frage und dem letzten Buchstaben gehört die Fläche dem Gespräch.</summary>
+    private bool _answering;
+    /// <summary>Wie viele Absätze der Antwort schon aufgetaucht sind (für den Auftritt).</summary>
+    private int _revealedBlocks;
+    /// <summary>Die drei Punkte der Laufanzeige.</summary>
+    private UIElement[] _dots = Array.Empty<UIElement>();
     private string? _renderedAnswer;
     private string? _renderedThinking;
     private bool _thinkingAutoExpanded;
@@ -86,14 +92,18 @@ public partial class MainWindow : Window
         // Weiches Scrollen: Vorschlagsliste und Antwort springen nie.
         _answerGlide = new Glide(AnswerScroll);
         _rowGlide = new Glide(SuggestionScroll);
+        _dots = new UIElement[] { Dot1, Dot2, Dot3 };
 
         // Wer im Text radelt, will selbst bestimmen, wo er liest — dann hört das
         // Nachziehen ans Ende auf.
         AnswerScroll.PreviewMouseWheel += (_, _) => _followAnswer = false;
     }
 
-    /// <summary>Bewegung nur dann, wenn wirklich ein Fenster auf dem Bildschirm steht.</summary>
-    private bool CanAnimate => _settings.AnimateBar && IsVisible;
+    /// <summary>
+    /// Bewegung nur dann, wenn wirklich ein Fenster auf dem Bildschirm steht — und
+    /// wenn weder die Einstellungen noch Windows selbst sie abgeschaltet haben.
+    /// </summary>
+    private bool CanAnimate => Motion.Moves && IsVisible;
 
     /// <summary>Zeile unter dem Mauszeiger (oder -1).</summary>
     private int RowUnderMouse()
@@ -182,6 +192,8 @@ public partial class MainWindow : Window
     /// <summary>Wie ein Enter im Eingabefeld — für den Prüfstand.</summary>
     internal void SubmitForTest() => ActivateSelectedOrAsk();
 
+    internal string InputTextForTest => Input.Text;
+
     internal void SetInputForTest(string text) => Input.Text = text;
 
     internal static string FooterForTest(AskResult result) => FooterText(result);
@@ -211,6 +223,18 @@ public partial class MainWindow : Window
 
     /// <summary>Läuft gerade ein weiches Ausblenden? (Prüfstand)</summary>
     internal bool IsHidingForTest => _hiding;
+
+    /// <summary>Steht der Vorschlagsbereich gerade im Bild? (Prüfstand)</summary>
+    internal bool SuggestionsVisibleForTest => SuggestionBox.Visibility == Visibility.Visible;
+
+    /// <summary>Läuft gerade eine Frage? (Prüfstand)</summary>
+    internal bool AnsweringForTest => _answering;
+
+    /// <summary>
+    /// Der sichtbare Teil einer Frage — ohne Netz. Genau der Weg, den auch
+    /// <see cref="Ask"/> nimmt, damit der Prüfstand keine zweite Fassung pflegt.
+    /// </summary>
+    internal void BeginAskForTest(string question) => BeginQuestion(question);
 
     /// <summary>Deckkraft der Leiste — der Prüfstand sieht nach, dass sie in Grundstellung zurückgeht.</summary>
     internal double ShellOpacityForTest => Root.Opacity;
@@ -258,6 +282,10 @@ public partial class MainWindow : Window
     /// <summary>Einstellungen anwenden (Breite, Schrift, Farben, Höhen).</summary>
     public void ApplySettings()
     {
+        // Der Schalter aus den Einstellungen gilt für alles, was sich bewegt —
+        // auch für den Zeichentakt und die Kurven.
+        Motion.Enabled = _settings.AnimateBar;
+
         Theme.Apply(_settings.Theme, _settings.Accent, _settings.Opacity,
             _settings.CornerRadius, _settings.FontFamily);
         Width = _settings.WindowWidth;
@@ -331,6 +359,7 @@ public partial class MainWindow : Window
         Activate();
         Input.SelectAll();
         Input.Focus();
+        UpdateFocusLine();
         ShownAt = DateTime.Now;
 
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
@@ -371,21 +400,30 @@ public partial class MainWindow : Window
     {
         ResetVisual();
 
-        if (!_settings.AnimateBar)
+        if (!CanAnimate)
         {
             return;
         }
 
-        Root.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.ShowMs));
+        // Deckkraft, Auftrieb und ein Hauch Wachsen greifen ineinander: erst ist
+        // die Leiste da, dann kommt sie an. Die Kurve ist die steile macOS-Kurve —
+        // mit einer flacheren wirkte derselbe Weg zäh.
+        Root.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.ShowMs, Motion.Soft));
         BarShift.BeginAnimation(
             TranslateTransform.YProperty,
-            new DoubleAnimation(-Motion.Rise, 0, Motion.ShowDuration) { EasingFunction = Motion.Out });
+            new DoubleAnimation(-Motion.Rise, 0, Motion.ShowDuration) { EasingFunction = Motion.Soft });
         BarScale.BeginAnimation(
             ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Out });
+            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Soft });
         BarScale.BeginAnimation(
             ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Out });
+            new DoubleAnimation(Motion.Grow, 1, Motion.ShowDuration) { EasingFunction = Motion.Soft });
+
+        // Der Lichtschein zieht mit ein: erst kaum sichtbar, dann liegt er still.
+        Sheen.BeginAnimation(OpacityProperty, null);
+        Sheen.Opacity = 1;
+        Sheen.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.PageMs, Motion.Soft));
+        Anim.Slide(Sheen, -8, 0, Motion.PageMs, Motion.Soft);
     }
 
     /// <summary>Grundstellung: keine laufende Animation, keine Verschiebung.</summary>
@@ -395,10 +433,13 @@ public partial class MainWindow : Window
         BarShift.BeginAnimation(TranslateTransform.YProperty, null);
         BarScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         BarScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        Sheen.BeginAnimation(OpacityProperty, null);
         Root.Opacity = 1;
         BarShift.Y = 0;
         BarScale.ScaleX = 1;
         BarScale.ScaleY = 1;
+        Sheen.Opacity = 1;
+        Anim.SlideNow(Sheen, 0);
     }
 
     /// <summary>
@@ -413,7 +454,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!_settings.AnimateBar)
+        if (!CanAnimate)
         {
             FinishHide();
             return;
@@ -437,10 +478,11 @@ public partial class MainWindow : Window
             new DoubleAnimation(0, -Motion.Rise * 0.6, Motion.HideDuration) { EasingFunction = Motion.In });
         BarScale.BeginAnimation(
             ScaleTransform.ScaleXProperty,
-            new DoubleAnimation(1, Motion.Grow, Motion.HideDuration) { EasingFunction = Motion.In });
+            new DoubleAnimation(1, Motion.Shrink, Motion.HideDuration) { EasingFunction = Motion.In });
         BarScale.BeginAnimation(
             ScaleTransform.ScaleYProperty,
-            new DoubleAnimation(1, Motion.Grow, Motion.HideDuration) { EasingFunction = Motion.In });
+            new DoubleAnimation(1, Motion.Shrink, Motion.HideDuration) { EasingFunction = Motion.In });
+        Sheen.BeginAnimation(OpacityProperty, Motion.Fade(1, 0, Motion.HideMs, Motion.In));
     }
 
     private void OnHideTimer(object? sender, EventArgs e)
@@ -630,6 +672,9 @@ public partial class MainWindow : Window
     private void OnInputChanged(object sender, TextChangedEventArgs e)
     {
         Placeholder.Visibility = Input.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        // Wer tippt, sucht etwas — die Regel unten bringt die Vorschläge dann
+        // von selbst zurück ins Bild, auch nach einer Antwort.
         RefreshSuggestions();
     }
 
@@ -653,47 +698,131 @@ public partial class MainWindow : Window
         _rowGlide?.Stop();
         SuggestionScroll.ScrollToTop();
         UpdateSelectionVisual();
-
-        var wasVisible = SuggestionList.Visibility == Visibility.Visible;
         SuggestionList.Visibility = _rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        if (_rows.Count > 0 && !wasVisible)
+
+        var wanted = _rows.Count > 0 && ShouldShowSuggestions;
+        var visible = SuggestionBox.Visibility == Visibility.Visible;
+        if (wanted && !visible)
         {
-            RevealList();
+            ShowSuggestions();
+        }
+        else if (!wanted && visible)
+        {
+            HideSuggestions();
         }
     }
 
-    /// <summary>Die Vorschlagsliste taucht auf — kurz und weich, statt zu erscheinen.</summary>
-    private void RevealList()
+    /// <summary>
+    /// Wann gehören Vorschläge ins Bild?
+    ///
+    /// Immer dann, wenn gerade gesucht wird (es steht etwas im Feld) oder wenn
+    /// es nichts zu lesen gibt. Sobald eine Frage läuft oder eine Antwort dasteht,
+    /// bleibt der Platz dem Gespräch — genau das ist der Unterschied zwischen
+    /// einer Auswahlliste und einem Chat.
+    /// </summary>
+    private bool ShouldShowSuggestions
+        => Input.Text.Trim().Length > 0 || !(_answering || HasVisibleAnswer);
+
+    /// <summary>Steht eine Antwort im Bild, die man lesen kann?</summary>
+    private bool HasVisibleAnswer
+        => AnswerBox.Visibility == Visibility.Visible && AnswerPanel.Children.Count > 0;
+
+    /// <summary>
+    /// Vorschläge aufklappen. Die Zeilen kommen der Reihe nach herein — eine
+    /// Liste, die auf einmal dasteht, wirkt hineingeworfen.
+    /// </summary>
+    private void ShowSuggestions()
     {
-        SuggestionScroll.BeginAnimation(OpacityProperty, null);
-        SuggestionScroll.Opacity = 1;
-        if (CanAnimate)
+        if (_rows.Count == 0)
         {
-            SuggestionScroll.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
+            return;
         }
+
+        SuggestionList.Visibility = Visibility.Visible;
+        Anim.Expand(SuggestionBox, Motion.CollapseMs);
+        RevealRows();
+    }
+
+    /// <summary>Vorschläge zuklappen — Höhe, Deckkraft und kein Rest danach.</summary>
+    private void HideSuggestions()
+    {
+        _rowGlide?.Stop();
+        Anim.Collapse(SuggestionBox, Motion.CollapseMs);
+    }
+
+    /// <summary>
+    /// Jede Zeile einen Wimpernschlag nach der vorigen. Nur beim wirklichen
+    /// Erscheinen: beim Tippen wird die Liste nur umgesetzt, sonst zappelten die
+    /// Zeilen bei jedem Buchstaben.
+    /// </summary>
+    private void RevealRows()
+    {
+        SuggestionList.UpdateLayout();
+        var containers = new List<FrameworkElement>();
+        for (var index = 0; index < _rows.Count; index++)
+        {
+            if (SuggestionList.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+            {
+                containers.Add(container);
+            }
+        }
+
+        Anim.Stagger(containers, Motion.StaggerMs, Motion.BlockMs);
     }
 
     /// <summary>Die Denk-Schritte tauchen einmal auf — nicht bei jedem Zeichentakt.</summary>
     private void RevealThinking()
     {
-        ThinkingBox.BeginAnimation(OpacityProperty, null);
-        ThinkingBox.Opacity = 1;
-        if (CanAnimate)
-        {
-            ThinkingBox.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
-        }
+        Anim.Reset(ThinkingBox);
+        Anim.FadeNow(ThinkingBox, 0);
+        Anim.Fade(ThinkingBox, 1, Motion.QuickMs, Motion.Soft);
+        Anim.Slide(ThinkingBox, 6, 0, Motion.PageMs, Motion.Soft);
     }
 
     /// <summary>Denk-Schritte wieder wegnehmen (ohne stehengebliebene Animation).</summary>
     private void HideThinking()
     {
-        ThinkingBox.BeginAnimation(OpacityProperty, null);
-        ThinkingBox.Opacity = 1;
+        Anim.Reset(ThinkingBox);
         ThinkingBox.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Die Fokuslinie unter der Eingabezeile wächst aus der Mitte, wenn man
+    /// hineinklickt, und zieht sich dorthin zurück, wenn man wieder geht.
+    /// </summary>
+    private void OnInputFocusChanged(object sender, KeyboardFocusChangedEventArgs e) => UpdateFocusLine();
+
+    /// <summary>
+    /// Die Fokuslinie auf den richtigen Stand bringen — beim Hineinklicken, beim
+    /// Verlassen und jedes Mal, wenn die Leiste auftaucht.
+    /// </summary>
+    private void UpdateFocusLine()
+    {
+        var focused = Input.IsKeyboardFocusWithin;
+        var target = focused ? 1 : 0;
+        FocusLine.Opacity = target;
+        FocusScale.ScaleX = target;
+
+        if (!CanAnimate)
+        {
+            return;
+        }
+
+        FocusLine.BeginAnimation(OpacityProperty, Motion.Fade(1 - target, target, Motion.QuickMs, Motion.Out));
+        FocusScale.BeginAnimation(
+            ScaleTransform.ScaleXProperty,
+            Motion.Tween(1 - target, target, Motion.PageMs, Motion.Soft));
     }
 
     private void MoveSelection(int delta)
     {
+        // Wer mit den Pfeilen wählt, will die Liste sehen — auch wenn gerade
+        // eine Antwort dasteht.
+        if (SuggestionBox.Visibility != Visibility.Visible)
+        {
+            ShowSuggestions();
+        }
+
         if (_rows.Count == 0)
         {
             return;
@@ -887,6 +1016,10 @@ public partial class MainWindow : Window
                 ((App)Application.Current).OpenSettings();
                 break;
 
+            case "welcome":
+                ((App)Application.Current).OpenWelcome();
+                break;
+
             case "help":
                 ShowText("Befehle", HelpText());
                 break;
@@ -915,6 +1048,8 @@ public partial class MainWindow : Window
         _lastQuestion = "";
         _thinkingAutoExpanded = false;
         _followAnswer = false;
+        _answering = false;
+        _revealedBlocks = 0;
         _answerGlide?.Stop();
         InvalidateAnswer();
         StopSpinner();
@@ -993,7 +1128,9 @@ public partial class MainWindow : Window
         _rowGlide?.Stop();
         SuggestionScroll.ScrollToTop();
         UpdateSelectionVisual();
-        SuggestionList.Visibility = Visibility.Visible;
+
+        // Der Verlauf ist eine Auswahlliste — also darf sie auch wieder aufgehen.
+        ShowSuggestions();
         SetHint($"{entries.Count} Eintrag/Einträge — Enter zeigt die Antwort, /forget <Wort> löscht.");
         Input.Focus();
     }
@@ -1066,8 +1203,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        BeginQuestion(question);
+        Meta.Text = display;
+
+        var token = new CancellationTokenSource();
+        _cancel = token;
+        _streaming = true;
+        _startedAt = DateTime.Now;
+        StartPaintTimer();
+
+        _ = RunAsync(question, token.Token);
+    }
+
+    /// <summary>
+    /// Der sichtbare Teil einer Frage: das Feld wird leer, die Vorschläge klappen
+    /// weg — von da an gehört die Fläche dem Gespräch — und der Antwortbereich
+    /// steht bereit. Die Marke gibt dabei eine kurze Rückmeldung.
+    /// </summary>
+    private void BeginQuestion(string question)
+    {
         _lastQuestion = question;
+        _answering = true;
+        HideSuggestions();
+        Anim.Pulse(BrandChip, 1.07, 320, Motion.Spring);
+
         Input.Clear();
+        _revealedBlocks = 0;
         InvalidateAnswer();
         _answer.Clear();
         _thinking.Clear();
@@ -1085,15 +1246,6 @@ public partial class MainWindow : Window
         StopButton.Visibility = Visibility.Visible;
         _thinkingAutoExpanded = false;
         SetHint("Anfrage läuft — Esc bricht ab.");
-        Meta.Text = display;
-
-        var token = new CancellationTokenSource();
-        _cancel = token;
-        _streaming = true;
-        _startedAt = DateTime.Now;
-        StartPaintTimer();
-
-        _ = RunAsync(question, token.Token);
     }
 
     private async Task RunAsync(string question, CancellationToken token)
@@ -1137,6 +1289,7 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             _streaming = false;
+            _answering = false;
             StopPaintTimer();
             FlushAnswer();
             StopSpinner();
@@ -1228,25 +1381,43 @@ public partial class MainWindow : Window
 
     private void StopPaintTimer() => _paint?.Stop();
 
-    /// <summary>Der kleine Punkt atmet, solange eine Antwort läuft.</summary>
+    /// <summary>
+    /// Die drei Punkte leuchten der Reihe nach auf — jeder um ein Drittel der
+    /// Runde versetzt. Das liest sich als „ich denke“ und nicht als „irgendwas
+    /// blinkt“; ein einzelner Punkt konnte das nicht erzählen.
+    /// </summary>
     private void StartSpinner()
     {
-        var pulse = new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(560))
+        var step = Motion.DotMs;
+        for (var index = 0; index < _dots.Length; index++)
         {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-        };
-        Spinner.Opacity = 1;
-        if (_settings.AnimateBar)
-        {
-            Spinner.BeginAnimation(UIElement.OpacityProperty, pulse);
+            var dot = _dots[index];
+            dot.BeginAnimation(OpacityProperty, null);
+            dot.Opacity = 0.3;
+            if (!CanAnimate)
+            {
+                dot.Opacity = 1;
+                continue;
+            }
+
+            var pulse = new DoubleAnimation(0.3, 1, Motion.After(step))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                BeginTime = TimeSpan.FromMilliseconds(index * step * 0.6),
+                EasingFunction = Motion.Out,
+            };
+            dot.BeginAnimation(OpacityProperty, pulse);
         }
     }
 
     private void StopSpinner()
     {
-        Spinner.BeginAnimation(UIElement.OpacityProperty, null);
-        Spinner.Opacity = 1;
+        foreach (var dot in _dots)
+        {
+            dot.BeginAnimation(OpacityProperty, null);
+            dot.Opacity = 1;
+        }
     }
 
     private void OnPaintTick(object? sender, EventArgs e)
@@ -1263,17 +1434,15 @@ public partial class MainWindow : Window
         _renderedThinking = null;
     }
 
-    /// <summary>Die Antwort taucht auf — kurz, ohne die Anordnung zu stören.</summary>
+    /// <summary>
+    /// Der Antwortbereich steht bereit. Die Bewegung übernehmen die Absätze
+    /// selbst (siehe <see cref="FlushAnswer"/>): ein zweites Einblenden über den
+    /// ganzen Bereich würde die Staffelung darunter verwischen.
+    /// </summary>
     private void RevealAnswer()
     {
-        AnswerBox.BeginAnimation(OpacityProperty, null);
-        AnswerBox.Opacity = 1;
-        if (!CanAnimate)
-        {
-            return;
-        }
-
-        AnswerBox.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
+        Anim.Reset(AnswerBox);
+        Anim.Slide(AnswerBox, 5, 0, Motion.PageMs, Motion.Soft);
     }
 
     /// <summary>Angesammelten Text als Markdown darstellen (nur während des Streamens).</summary>
@@ -1309,11 +1478,20 @@ public partial class MainWindow : Window
         _renderedThinking = thinking;
         AnswerRenderCountForTest++;
 
+        var blocks = Markdown.Render(text, _settings.FontSize);
+        var shown = Math.Clamp(_revealedBlocks, 0, blocks.Count);
         AnswerPanel.Children.Clear();
-        foreach (var block in Markdown.Render(text, _settings.FontSize))
+        foreach (var block in blocks)
         {
             AnswerPanel.Children.Add(block);
         }
+
+        _revealedBlocks = blocks.Count;
+
+        // Nur die neuen Absätze tauchen auf. Vorher stand die ganze Antwort mit
+        // einem Schlag da — beim Schreiben sah das nach Flackern aus, weil jeder
+        // Takt den ganzen Baum neu setzte.
+        Anim.Stagger(blocks.Skip(shown).ToList(), Motion.StaggerMs, Motion.BlockMs);
 
         if (thinking.Length > 0)
         {
@@ -1355,6 +1533,9 @@ public partial class MainWindow : Window
         AnswerBox.Visibility = Visibility.Visible;
         ShowFromTop();
         Meta.Text = FooterText(result);
+
+        // Auch hier gilt: eine Antwort gehört allein ins Bild.
+        RefreshSuggestions();
     }
 
     private void ShowText(string title, string markdown)
@@ -1378,6 +1559,7 @@ public partial class MainWindow : Window
         _followAnswer = false;
         _answerGlide?.Stop();
         InvalidateAnswer();
+        _revealedBlocks = 0;
         FlushAnswer();
         AnswerScroll.ScrollToTop();
         RevealAnswer();

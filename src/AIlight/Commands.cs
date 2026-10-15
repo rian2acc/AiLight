@@ -22,6 +22,7 @@ public static class Commands
         new CommandInfo("copy", "Letzte Antwort in die Zwischenablage kopieren"),
         new CommandInfo("save", "Letzte Antwort als Datei speichern"),
         new CommandInfo("settings", "Einstellungen öffnen"),
+        new CommandInfo("welcome", "Einführung: Nutzung in sieben Schritten"),
         new CommandInfo("help", "Diese Befehlsliste anzeigen"),
         new CommandInfo("quit", "AIlight beenden"),
     };

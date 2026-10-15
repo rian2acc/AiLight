@@ -4,6 +4,107 @@ Alle nennenswerten Änderungen an AIlight. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.4.0] — 2026-10-15
+
+### Neu
+
+- **Einführung beim ersten Start.** Sieben Schritte erklären alles, was man zum
+  Benutzen braucht: Willkommen, Schlüssel, Hotkey, Fragen, Befehle und Tasten,
+  Aussehen, Fertig. Auf der Fragen-Seite tippt sich eine Beispiel-Frage selbst
+  und wird beantwortet, damit man den Ablauf sieht, bevor man ihn benutzt.
+  Geblättert wird mit „Weiter“, `←` `→`, `Enter` oder einem Klick auf einen
+  Schritt; im letzten Schritt lassen sich Autostart und Vorbereitung einstellen,
+  „Schlüssel erstellen“ führt direkt zu console.groq.com. Die Einführung läuft
+  **einmal** und ist danach jederzeit wieder da: über `/welcome`, im Menü des
+  Infobereich-Symbols und in den Einstellungen unter „Verhalten“.
+- **Nach einer Frage bleibt nur das Gespräch.** Wird eine Frage abgeschickt,
+  klappen die Vorschläge weg — mit Höhe, Deckkraft und einem kurzen
+  Zurückweichen, nicht mit einem Schlag. Beim Tippen kommen sie sofort zurück,
+  und die Pfeiltasten holen sie ebenfalls hervor. Die Regel dahinter ist einfach:
+  gefragt wird, dann gehört die Fläche der Antwort.
+- **Die Vorschläge ziehen als Liste herein.** Jede Zeile kommt einen Wimpernschlag
+  nach der vorigen (26 ms Abstand), Absätze einer neuen Antwort ebenso — statt
+  dass alles auf einmal dasteht.
+- **Drei Punkte statt eines Blinkers.** Solange geantwortet wird, leuchten drei
+  Punkte der Reihe nach auf; ein einzelner Punkt konnte „ich denke“ nicht erzählen.
+- **Die Marke gibt Rückmeldung.** Beim Abschicken einer Frage wird sie kurz
+  einen Hauch größer; unter der Eingabezeile wächst beim Hineinklicken eine
+  dünne Akzentlinie aus der Mitte.
+
+### Geändert
+
+- **Eine Kurve für alles.** `Views/Curve.cs` rechnet kubische Bézier-Kurven wie
+  eine Website — mit Newton-Verfahren, nicht mit „ungefähr“. Die Hauskurve ist
+  die steile Auslaufkurve von macOS: `cubic-bezier(0.32, 0.72, 0, 1)`. Alle 30
+  Übergänge in `Views/Theme.xaml` haben jetzt eine solche Kurve und Dauern aus
+  dem Haus (Drücken 90 ms, Details 140 ms, Zurücknehmen 220 ms); vorher liefen
+  sie **linear** — genau das fühlte sich hart an.
+- **Bewegung liegt an einer Stelle** (`Views/Motion.cs`) — Zeiten, Maße und
+  Kurven — und gehorcht zwei Schaltern: dem in AIlight und dem von Windows
+  („Animationen im Clientbereich“). Ist einer aus, ist alles sofort da.
+- **Das Scrollen hängt am Zeichentakt** (`Views/Glide.cs`) statt an einem
+  16-ms-Zeitgeber: es läuft bildsynchron, und das Nachziehen ans Textende hängt
+  von der Bilddauer ab, damit es auf 60- und 144-Hz-Bildschirmen gleich aussieht.
+- **Der Auftritt der Leiste** ist um ein Drittel ruhiger und nutzt dieselbe Kurve;
+  beim Erscheinen zieht der Lichtschein mit ein.
+- Der Antwortbereich blendet nicht mehr als Ganzes ein, sondern Absatz für Absatz.
+
+### Behoben
+
+- **Animationen liefen auch ohne sichtbares Fenster.** Im Prüfstand und für die
+  Bilder wurde die Oberfläche aufgebaut, ohne dass ein Fenster auf dem Bildschirm
+  stand — die Bewegung lief trotzdem los, und weil kein Bild vergeht, blieben
+  Vorschlagszeilen halb durchsichtig (im Bildschirmfoto ganz unsichtbar). Jetzt
+  wird nur dort bewegt, wo es wirklich etwas zu sehen gibt, und sonst der
+  Endzustand gesetzt. Aufgefallen ist es dem Selbsttest, nicht dem Auge.
+- **Keine klebrigen Zustände mehr.** WPF-Animationen bleiben auf ihrem Endwert
+  stehen und überschreiben danach jede Änderung derselben Eigenschaft — daher
+  kamen halb durchsichtige Bereiche und feste Höhen, die nicht mehr wachsen
+  wollten. `Views/Anim.cs` räumt jede Bewegung nach ihrem Ende ab und setzt den
+  Grundwert auf den gewünschten Endzustand.
+- **Zuklappen hinterlässt keine feste Höhe**, der Bereich misst sich danach
+  wieder selbst.
+- Der Verlauf (`/history`) öffnet die Liste zuverlässig, auch wenn gerade eine
+  Antwort dasteht.
+
+### Installer und Verteilung
+
+- **Portable Fassung und Prüfsummen bei jedem Release.** Neben dem Installer
+  liegt `AIlightPortable.zip` (dieselbe Version, entpacken und starten) und
+  `SHA256SUMS.txt` mit beiden Prüfsummen — beides wird auch in der CI erzeugt und
+  angehängt.
+- **Signieren ist vorbereitet.** `tools\build.ps1 -Sign` signiert die
+  Programmdatei vor dem Packen, übergibt Inno Setup den Signaturbefehl (damit
+  auch der Deinstaller signiert wird) und signiert zum Schluss den fertigen
+  Installer. In der CI passiert dasselbe, sobald `SIGNING_PFX_BASE64` und
+  `SIGNING_PFX_PASSWORD` als Geheimnisse hinterlegt sind.
+- **Verdichtung von `lzma2/ultra64` auf `lzma2/max`**: der Installer wird dadurch
+  größer (gemessen 49,4 statt 48,5 MB, +1,5 %), entpackt aber schneller und
+  wirkt weniger wie ein gepacktes Bündel. Ausdrücklich **kein belegter Schutz
+  gegen Fehlalarme** — die einzige echte Abhilfe ist eine Signatur.
+- **Vollständige Dateiangaben** in Programm und Installer (Hersteller, Copyright,
+  Produkt und Version): Windows, Dateieigenschaften und Scanner lesen sie.
+- **Anleitung für den Fehlalarm** in [docs/signieren.md](docs/signieren.md):
+  warum es passiert, wie man signiert, wo man eine Falschmeldung einreicht
+  (Microsoft und McAfee) und warum man den Virenschutz nicht abschalten sollte.
+
+### Sicherheit
+
+- Selbsttest von 52 auf **59 Prüfungen** erweitert. Neu sind:
+  - die Hauskurve (Stützpunkte, steiler Verlauf, kein Überschwingen, Endpunkte),
+  - **alle Übergänge des Aufbaus**: jeder muss eine Kurve haben und eine Dauer
+    aus dem Haus — eine Prüfung, die bis in die Gestaltungsvorlagen hineinsieht,
+  - der Windows-Schalter für Bewegung,
+  - Scrollen ohne Bewegung (springt sofort, statt hängen zu bleiben),
+  - das Verhalten der Vorschläge nach einer Frage (weg, beim Tippen zurück),
+  - die Einführung: sieben Schritte, Blättern vor und zurück, Beschriftung,
+    laufende Vorführung, vollständige Befehlsliste, sichtbare Marke am Pixel,
+    der „Weiter“-Knopf innerhalb des Fensters und dass „gesehen“ gespeichert wird.
+- **Wer AIlight schon benutzt, sieht die Einführung einmal.** Der Vermerk „schon
+  gesehen“ ist neu und fehlt in bestehenden Einstellungen — er wird also beim
+  ersten Start nach diesem Update auf `false` stehen. Wer sie nicht noch einmal
+  ansehen will: einmal mit `Esc` schließen, danach kommt sie nicht wieder.
+
 ## [2.3.0] — 2026-10-15
 
 ### Neu

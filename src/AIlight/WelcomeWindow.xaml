@@ -1,0 +1,639 @@
+<Window
+    x:Class="AIlight.WelcomeWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="AIlight — Einführung"
+    Width="900"
+    Height="600"
+    AllowsTransparency="True"
+    Background="Transparent"
+    FontFamily="{DynamicResource Font.Ui}"
+    Foreground="{DynamicResource Brush.Text}"
+    Loaded="OnLoaded"
+    PreviewKeyDown="OnWindowKeyDown"
+    ResizeMode="NoResize"
+    ShowInTaskbar="True"
+    SnapsToDevicePixels="True"
+    WindowStartupLocation="CenterScreen"
+    WindowStyle="None">
+
+    <!--
+      Die Einführung: links die Schritte, rechts die Seite, unten das Weiter.
+      Sie erklärt in sieben Schritten alles, was man zum Benutzen braucht — und
+      läuft genau einmal, beim ersten Start nach der Installation.
+    -->
+
+    <Window.Resources>
+        <!--  Eine Taste, wie man sie auf einer Tastatur sieht  -->
+        <Style x:Key="Kbd" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Card}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.FieldBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style x:Key="Kbd.Text" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Font.Mono}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+        </Style>
+        <!--  Eine Zeile in einer Liste: Punkt links, Text rechts  -->
+        <Style x:Key="Point" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,7" />
+        </Style>
+        <Style x:Key="Step.Dot" TargetType="Ellipse">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="Height" Value="5" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Fill" Value="{DynamicResource Brush.Separator}" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root" Margin="18" RenderTransformOrigin="0.5,0.5">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="RootShift" Y="0" />
+        </Grid.RenderTransform>
+        <Border Style="{StaticResource Chrome.ShadowLayer}" />
+
+        <Border Style="{StaticResource Chrome.Shell}">
+            <Grid>
+                <Border Height="120" Style="{StaticResource Chrome.Sheen}" />
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="54" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!--  ── Titelzeile  ────────────────────────────────────────  -->
+                    <Grid Grid.Row="0" MouseLeftButtonDown="OnTitleBarMouseDown">
+                        <StackPanel Margin="17,0,0,0" VerticalAlignment="Center" Orientation="Horizontal">
+                            <Button
+                                Click="OnClose"
+                                Content="✕"
+                                Style="{StaticResource Chrome.Close}"
+                                ToolTip="Einführung schließen (Esc)" />
+                            <Button
+                                Click="OnMinimize"
+                                Content="–"
+                                Style="{StaticResource Chrome.Button}"
+                                ToolTip="Verkleinern" />
+                        </StackPanel>
+                        <StackPanel
+                            Margin="15,0,0,0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            IsHitTestVisible="False"
+                            Orientation="Horizontal">
+                            <Control
+                                Width="18"
+                                Height="18"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource Mark}" />
+                            <TextBlock
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource Title}"
+                                Text="AIlight" />
+                            <TextBlock
+                                Margin="10,1,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource Caption}"
+                                Text="Einführung" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="248" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!--  ── Schiene links  ────────────────────────────────  -->
+                        <Border
+                            Grid.Column="0"
+                            Background="{DynamicResource Brush.Card}"
+                            BorderBrush="{DynamicResource Brush.Separator}"
+                            BorderThickness="0,1,1,0"
+                            CornerRadius="0,0,0,14">
+                            <DockPanel Margin="10,14,10,12">
+                                <StackPanel DockPanel.Dock="Top" Margin="8,0,8,16">
+                                    <Control
+                                        x:Name="BrandMark"
+                                        Width="42"
+                                        Height="42"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource Mark}" />
+                                    <TextBlock
+                                        Margin="0,10,0,0"
+                                        FontSize="19"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="Willkommen" />
+                                    <TextBlock
+                                        x:Name="StepCount"
+                                        Margin="0,2,0,0"
+                                        Style="{StaticResource Caption}"
+                                        Text="" />
+                                </StackPanel>
+
+                                <TextBlock
+                                    DockPanel.Dock="Bottom"
+                                    Margin="10,12,10,0"
+                                    Style="{StaticResource Caption}"
+                                    Text="Esc schließt · ← → blättert · diese Einführung findest du später unter /welcome wieder." />
+
+                                <StackPanel x:Name="StepPanel">
+                                    <ToggleButton
+                                        x:Name="NavWillkommen"
+                                        Click="OnStepClick"
+                                        Content="Willkommen"
+                                        IsChecked="True"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="willkommen" />
+                                    <ToggleButton
+                                        x:Name="NavSchluessel"
+                                        Click="OnStepClick"
+                                        Content="Schlüssel"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="schluessel" />
+                                    <ToggleButton
+                                        x:Name="NavHotkey"
+                                        Click="OnStepClick"
+                                        Content="Die Leiste öffnen"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="hotkey" />
+                                    <ToggleButton
+                                        x:Name="NavFragen"
+                                        Click="OnStepClick"
+                                        Content="Fragen stellen"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="fragen" />
+                                    <ToggleButton
+                                        x:Name="NavBefehle"
+                                        Click="OnStepClick"
+                                        Content="Befehle und Tasten"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="befehle" />
+                                    <ToggleButton
+                                        x:Name="NavAussehen"
+                                        Click="OnStepClick"
+                                        Content="Aussehen"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="aussehen" />
+                                    <ToggleButton
+                                        x:Name="NavFertig"
+                                        Click="OnStepClick"
+                                        Content="Fertig"
+                                        Style="{StaticResource Nav.Item}"
+                                        Tag="fertig" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!--  ── Seite rechts  ─────────────────────────────────  -->
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ScrollViewer
+                                x:Name="PageScroll"
+                                Grid.Row="0"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                                <Grid Margin="32,26,32,8">
+
+                                    <!--  Schritt 1: Willkommen  -->
+                                    <StackPanel x:Name="PageWillkommen">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Eine Leiste, ein Hotkey, eine Antwort."
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,20"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="AIlight sitzt unsichtbar im Hintergrund und erscheint, wenn du es rufst — mitten auf dem Bildschirm, über allem anderen. Tippe deine Frage, drücke Enter, und die Antwort wächst Buchstabe für Buchstabe heran."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Was dich hier erwartet" />
+                                                <TextBlock Margin="0,8,0,0" Style="{StaticResource Point}" Text="①  Der Schlüssel, mit dem AIlight Fragen stellt" />
+                                                <TextBlock Style="{StaticResource Point}" Text="②  Wie du die Leiste aufrufst" />
+                                                <TextBlock Style="{StaticResource Point}" Text="③  Fragen, Antworten, Kopieren, Speichern" />
+                                                <TextBlock Style="{StaticResource Point}" Text="④  Alle Befehle und Tasten auf einen Blick" />
+                                                <TextBlock Style="{StaticResource Point}" Text="⑤  Farben, Schrift und Bewegung" />
+                                                <TextBlock Style="{StaticResource Point}" Text="⑥  Los geht's" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Was auf diesem Rechner bleibt" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Einstellungen, Verlauf und Schlüssel liegen in deinem Benutzerprofil (%APPDATA%\AIlight); der Schlüssel zusätzlich verschlüsselt. Nur die Frage selbst und die letzten Runden gehen an die KI. Kein Konto, keine Anmeldung, keine Telemetrie." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 2: Schlüssel  -->
+                                    <StackPanel x:Name="PageSchluessel" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Zuerst der Schlüssel"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,20"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="AIlight rechnet nicht selbst: es fragt ein Modell bei Groq. Dafür brauchst du einen eigenen API-Schlüssel — er ist kostenlos und in einer Minute erstellt."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="In drei Schritten" />
+                                                <TextBlock Margin="0,10,0,0" Style="{StaticResource Point}" Text="1.  Auf console.groq.com/keys ein Konto anlegen (oder anmelden)." />
+                                                <TextBlock Style="{StaticResource Point}" Text="2.  „Create API Key“ drücken und den Schlüssel kopieren — er beginnt mit gsk_." />
+                                                <TextBlock Style="{StaticResource Point}" Text="3.  In den Einstellungen unter „Konto“ einfügen und mit „Schlüssel testen“ prüfen." />
+                                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                                    <Button
+                                                        Click="OnOpenKeys"
+                                                        Content="Schlüssel erstellen"
+                                                        Style="{StaticResource Button.Primary}" />
+                                                    <Button
+                                                        Click="OnOpenAccount"
+                                                        Content="Einstellungen öffnen"
+                                                        Style="{StaticResource Button.Ghost}" />
+                                                </StackPanel>
+                                                <TextBlock
+                                                    x:Name="KeyStatus"
+                                                    Margin="0,12,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Ohne Schlüssel?" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Dann läuft AIlight trotzdem: Befehle wie /help, /history und die Einstellungen funktionieren, nur Fragen bleiben unbeantwortet. Der Hinweis unten rechts erinnert dich freundlich daran." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 3: Hotkey  -->
+                                    <StackPanel x:Name="PageHotkey" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Die Leiste rufen"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,20"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="Drücke irgendwo — in jeder Anwendung — diese Tasten. Die Leiste legt sich über alles andere, das Eingabefeld wartet schon."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <StackPanel Margin="0,0,0,10" Orientation="Horizontal">
+                                                    <Border Style="{StaticResource Kbd}"><TextBlock Style="{StaticResource Kbd.Text}" Text="Alt" /></Border>
+                                                    <TextBlock Margin="0,2,6,0" Style="{StaticResource Kbd.Text}" Text="+" />
+                                                    <Border Style="{StaticResource Kbd}"><TextBlock Style="{StaticResource Kbd.Text}" Text="Leertaste" /></Border>
+                                                    <TextBlock
+                                                        Margin="8,2,0,0"
+                                                        Style="{StaticResource Value}"
+                                                        Text="Leiste öffnen und schließen" />
+                                                </StackPanel>
+                                                <Border Style="{StaticResource Line}" />
+                                                <TextBlock Margin="0,8,0,0" Style="{StaticResource Point}" Text="Noch einmal dieselben Tasten: die Leiste schließt sich wieder." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Esc leert das Feld, ein zweites Esc schließt die Leiste." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Ein Klick daneben schließt sie ebenfalls (abschaltbar)." />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Wenn Alt+Leertaste belegt ist" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Manche Programme belegen diese Tasten selbst. Dann meldet AIlight es unten rechts, und du wählst in den Einstellungen unter „Verhalten“ eine andere Kombination — einfach die gewünschten Tasten drücken, sie wird sofort übernommen." />
+                                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                                    <Button
+                                                        Click="OnOpenBehaviour"
+                                                        Content="Hotkey ändern"
+                                                        Style="{StaticResource Button.Ghost}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Ganz ohne Tasten" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Unten rechts neben der Uhr sitzt das Symbol von AIlight. Ein Klick darauf öffnet dieselbe Leiste; das Menü öffnet Einstellungen, Verlauf, ein neues Gespräch — oder beendet AIlight." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 4: Fragen  -->
+                                    <StackPanel x:Name="PageFragen" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Fragen stellen"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,18"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="So sieht das aus — hier läuft es einmal vor:"
+                                            TextWrapping="Wrap" />
+
+                                        <Border
+                                            Margin="0,0,0,16"
+                                            Padding="0"
+                                            Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <Grid Height="46">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="44" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border
+                                                        Width="26"
+                                                        Height="26"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource Brush.Selection}"
+                                                        CornerRadius="8">
+                                                        <Control
+                                                            Width="15"
+                                                            Height="15"
+                                                            Style="{StaticResource Mark}" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
+                                                        <TextBlock
+                                                            x:Name="DemoQuestion"
+                                                            FontSize="15"
+                                                            Foreground="{DynamicResource Brush.Text}"
+                                                            Text="" />
+                                                        <Border
+                                                            x:Name="DemoCaret"
+                                                            Width="1.5"
+                                                            Height="17"
+                                                            Margin="1,0,0,0"
+                                                            Background="{DynamicResource Brush.Accent}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Border Height="1" Background="{DynamicResource Brush.Separator}" />
+                                                <StackPanel x:Name="DemoAnswer" Margin="16,11,16,13" Opacity="0">
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        Foreground="{DynamicResource Brush.Text}"
+                                                        Text="Strom ist die Bewegung von Ladungsträgern."
+                                                        TextWrapping="Wrap" />
+                                                    <TextBlock
+                                                        Margin="0,4,0,0"
+                                                        Style="{StaticResource Caption}"
+                                                        Text="gpt-oss-20b · 240 → 96 Tokens · 0,7 s" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Die wichtigsten Handgriffe" />
+                                                <TextBlock Margin="0,10,0,0" Style="{StaticResource Point}" Text="Enter schickt die Frage ab · Esc bricht eine laufende Antwort ab." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Strg+C kopiert die Antwort · /save legt sie als Datei in „Dokumente\AIlight-Antworten“." />
+                                                <TextBlock Style="{StaticResource Point}" Text="↑ ↓ wählen Vorschläge, Tab übernimmt sie — Vorschläge verschwinden, sobald eine Frage läuft, und kommen beim Tippen zurück." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Strg+N beginnt ein neues Gespräch · Strg+H öffnet den Verlauf · Strg+, die Einstellungen." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Die Leiste merkt sich die letzten Runden, damit Rückfragen wie „und warum?“ funktionieren — einstellbar, auch auf null." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 5: Befehle  -->
+                                    <StackPanel x:Name="PageBefehle" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Befehle und Tasten"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,18"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="Alles, was die Leiste außer Fragen kann, beginnt mit einem Schrägstrich. Es genügt, die ersten Buchstaben zu tippen — die Vorschläge vervollständigen mit Tab."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Befehle" />
+                                                <ItemsControl x:Name="CommandList" Margin="0,10,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,0,0,6">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="196" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Style="{StaticResource Kbd.Text}" Text="{Binding Name}" />
+                                                                <TextBlock
+                                                                    Grid.Column="1"
+                                                                    FontSize="12"
+                                                                    Foreground="{DynamicResource Brush.Muted}"
+                                                                    Text="{Binding Summary}"
+                                                                    TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Tasten" />
+                                                <ItemsControl x:Name="KeyList" Margin="0,10,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,0,0,6">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="196" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Style="{StaticResource Kbd.Text}" Text="{Binding Keys}" />
+                                                                <TextBlock
+                                                                    Grid.Column="1"
+                                                                    FontSize="12"
+                                                                    Foreground="{DynamicResource Brush.Muted}"
+                                                                    Text="{Binding What}"
+                                                                    TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 6: Aussehen  -->
+                                    <StackPanel x:Name="PageAussehen" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Aussehen und Bewegung"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,18"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="Jede Änderung wirkt sofort — kein Übernehmen, kein Neustart."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Akzentfarbe" />
+                                                <StackPanel
+                                                    x:Name="AccentPanel"
+                                                    Margin="0,12,0,4"
+                                                    Orientation="Horizontal" />
+                                                <TextBlock
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Sie färbt die Marke, die Auswahl, Regler, Schalter und die Vorschläge." />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Feineinstellung" />
+                                                <TextBlock Margin="0,10,0,0" Style="{StaticResource Point}" Text="Hell oder dunkel — oder einfach wie Windows." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Breite, Höhe und Schriftgröße der Leiste." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Eckenradius, Deckkraft und Schriftfamilie." />
+                                                <TextBlock Style="{StaticResource Point}" Text="Bewegung abschalten: dann ist alles sofort da, ohne Übergang. Windows sagt dasselbe, wenn dort „Animationen“ aus ist — AIlight hört auf beides." />
+                                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                                    <Button
+                                                        Click="OnOpenAppearance"
+                                                        Content="Aussehen öffnen"
+                                                        Style="{StaticResource Button.Ghost}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!--  Schritt 7: Fertig  -->
+                                    <StackPanel x:Name="PageFertig" Visibility="Collapsed">
+                                        <TextBlock
+                                            FontSize="24"
+                                            FontWeight="SemiBold"
+                                            Text="Fertig — jetzt bist du dran."
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Margin="0,8,0,20"
+                                            FontSize="14"
+                                            Foreground="{DynamicResource Brush.Muted}"
+                                            Text="AIlight startet mit Windows mit und wartet im Infobereich auf den nächsten Ruf. Beim ersten Start öffnet sich die Leiste von selbst."
+                                            TextWrapping="Wrap" />
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Beim Start" />
+                                                <Grid Margin="0,12,0,0">
+                                                    <TextBlock Style="{StaticResource Label}" Text="AIlight mit Windows starten" />
+                                                    <CheckBox
+                                                        x:Name="StartCheck"
+                                                        HorizontalAlignment="Right"
+                                                        Checked="OnToggleChanged"
+                                                        Style="{StaticResource Switch}"
+                                                        Unchecked="OnToggleChanged" />
+                                                </Grid>
+                                                <Grid Margin="0,12,0,0">
+                                                    <TextBlock Style="{StaticResource Label}" Text="Leiste im Voraus aufbauen (erster Aufruf ist dann sofort da)" />
+                                                    <CheckBox
+                                                        x:Name="PreloadCheck"
+                                                        HorizontalAlignment="Right"
+                                                        Checked="OnToggleChanged"
+                                                        Style="{StaticResource Switch}"
+                                                        Unchecked="OnToggleChanged" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Noch einmal ansehen" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Diese Einführung öffnet sich nur beim ersten Start. Später findest du sie jederzeit wieder: /welcome in der Leiste, im Menü des Infobereich-Symbols oder in den Einstellungen unter „Verhalten“." />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+
+                            <!--  ── Fußzeile mit dem Weiter  ─────────────────────  -->
+                            <Border
+                                Grid.Row="1"
+                                Height="66"
+                                Background="{DynamicResource Brush.Code}"
+                                BorderBrush="{DynamicResource Brush.Separator}"
+                                BorderThickness="0,1,0,0"
+                                CornerRadius="0,0,14,0">
+                                <Grid Margin="32,0">
+                                    <StackPanel
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                        <Button
+                                            x:Name="SkipButton"
+                                            Click="OnSkip"
+                                            Content="Überspringen"
+                                            Style="{StaticResource Button.Ghost}" />
+                                        <StackPanel x:Name="DotPanel" Margin="10,0,0,0" VerticalAlignment="Center" Orientation="Horizontal" />
+                                    </StackPanel>
+
+                                    <StackPanel
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                        <Button
+                                            x:Name="BackButton"
+                                            Click="OnBack"
+                                            Content="Zurück"
+                                            Style="{StaticResource Button.Ghost}" />
+                                        <Button
+                                            x:Name="NextButton"
+                                            Click="OnNext"
+                                            Content="Weiter"
+                                            Style="{StaticResource Button.Primary}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

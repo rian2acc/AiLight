@@ -31,44 +31,72 @@
 | **Globaler Hotkey** | `Alt+Space` (frei wählbar) — sofort da, aus jedem Programm |
 | **Streaming-Antworten** | Der Text erscheint Wort für Wort über die Groq-API |
 | **Smarte Vorschläge** | Frühere Fragen, Befehle, Zwischenablage — per Tastatur bedienbar |
+| **Nur das Gespräch** | Wird eine Frage abgeschickt, klappen die Vorschläge weg: der Platz gehört der Antwort. Beim Tippen sind sie sofort wieder da |
+| **Einführung beim ersten Start** | Sieben Schritte, die alles erklären — mit mitlaufender Vorführung; später jederzeit über `/welcome` |
 | **Neue Marke** | Leuchtender Punkt oben, drei Strahlen nach unten — die äußeren ergeben mit dem Querstrich ein **A**, der mittlere ist das **I** |
 | **macOS-Look** | Ruhige Flächen, Haarlinien, großzügige Ecken, ein Lichtschein von oben, Ampel-Knöpfe in den Einstellungen |
-| **Überall weich** | Auftritt der Leiste, Wechsel der Einstellungs-Seiten, Hover, Regler und Markierung: alles blendet über statt umzuspringen |
-| **Weicher Auftritt** | Die Leiste steigt auf und wächst einen Hauch — Auftritt 180 ms, Abgang 130 ms, kubisch ausklingend |
-| **Nichts springt** | Vorschlagsliste und Antwort gleiten: Auswahl wandert weich ins Bild, wachsender Text zieht sanft nach |
+| **Überall weich** | Auftritt der Leiste, Seitenwechsel, Hover, Regler, Markierung, Antwortabsätze und Listenzeilen: alles blendet über statt umzuspringen |
+| **Eine Kurve für alles** | Die steile Auslaufkurve von macOS (`cubic-bezier(0.32, 0.72, 0, 1)`), als eigene WPF-Kurve nachgerechnet und im Selbsttest geprüft — auch die Übergänge im Aufbau |
+| **Vorschläge kommen gestaffelt** | Jede Zeile folgt der vorigen um 26 ms; die Antwort blendet Absatz für Absatz auf, statt mit einem Schlag dazustehen |
+| **Nichts springt** | Vorschlagsliste und Antwort gleiten — bildsynchron (`CompositionTarget.Rendering`), damit es auf 60- und 144-Hz-Bildschirmen gleich aussieht |
+| **Drei Punkte statt eines Blinkers** | Solange geantwortet wird, leuchten drei Punkte der Reihe nach auf |
+| **Hört auf Windows** | Ist in Windows „Animationen“ abgeschaltet, bewegt sich auch AIlight nicht mehr — und in den Einstellungen lässt sich die Bewegung zusätzlich ausschalten |
 | **Schwebt nie im Weg** | Öffnen die Einstellungen, zieht sich die Leiste zurück — und holt sich dabei keinen fremden Fokus |
 | **Alles anpassbar** | Akzentfarbe (9 macOS-Töne), Ecken-Radius, Schrift, Breite/Höhe/Deckkraft, Bewegung, Fußzeile |
 | **Gesprächsgedächtnis** | Einstellbare Runden, `/forget` löscht |
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
-| **Selbsttest eingebaut** | `AIlight.exe --selftest` → 52 Prüfungen, teils auf Pixel-Ebene |
-| **Installer** | 48,5 MB (≈46 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
+| **Selbsttest eingebaut** | `AIlight.exe --selftest` → **59 Prüfungen**, teils auf Pixel-Ebene |
+| **Installer** | 49,4 MB (≈47 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
+| **Portable Fassung** | Dieselbe Version als `AIlightPortable.zip` — entpacken und starten, ohne Installer |
+| **Prüfsummen** | `SHA256SUMS.txt` liegt bei jedem Release bei |
 
 ## 📥 Installation
 
 ### Variante A: Installer (empfohlen)
 
-1. **`AIlightSetup.exe`** aus der [neuesten Fassung](https://github.com/rian2acc/AiLight/releases/latest) laden (48,5 MB)
+1. **`AIlightSetup.exe`** aus der [neuesten Fassung](https://github.com/rian2acc/AiLight/releases/latest) laden (49,4 MB)
 2. Ausführen — installiert nach `%LOCALAPPDATA%\AIlight`, legt Startmenü-Eintrag und Autostart an
-3. Beim ersten Start öffnet sich das Einstellungsfenster → **Groq-API-Schlüssel** einfügen (kostenlos auf [console.groq.com/keys](https://console.groq.com/keys))
+3. Die **Einführung** führt durch die sieben Schritte und fragt dabei nach dem Schlüssel
 4. `Alt+Space` drücken und fragen
 
-> Der Installer ist unsigniert — Windows SmartScreen fragt beim ersten Start nach
-> („Weitere Informationen“ → „Trotzdem ausführen“).
+### Variante B: Portable (ohne Installer)
 
-### Variante B: Aus dem Quellcode bauen
+**`AIlightPortable.zip`** laden, entpacken, `AIlight.exe` starten. Kein
+Installer, kein Eintrag, nichts, was sich einnistet — und ein Weg, der bei
+Virenschutz-Programmen grundsätzlich weniger Fragen aufwirft.
+
+### Variante C: Aus dem Quellcode bauen
 
 ```powershell
 # Voraussetzungen: .NET 8 SDK, Inno Setup 6
 git clone https://github.com/rian2acc/AiLight.git
 cd AiLight
 powershell -ExecutionPolicy Bypass -File tools\build.ps1
-# Ergebnis: dist\installer\AIlightSetup.exe
+# Ergebnis: dist\installer\AIlightSetup.exe, AIlightPortable.zip, SHA256SUMS.txt
 ```
 
-> Das Skript läuft den 52-Punkte-Selbsttest, veröffentlicht eine
+> Das Skript läuft den 59-Punkte-Selbsttest, veröffentlicht eine self-contained
+> EXE-Mappe (kein .NET nötig), packt den Installer, schreibt die Portable-Fassung
+> und die Prüfsummen. Schalter: `-SkipTest`, `-SkipInstaller`, `-Sign`
+> (signieren, siehe unten), `-Uncompressed`.
 
-> self-contained EXE-Mappe (kein .NET nötig) und packt den Installer. Schalter: `-SkipTest`, `-SkipInstaller`.
+
+## 🛡️ Wenn Windows oder der Virenschutz meckert
+
+Der Installer ist **nicht signiert**. Manche Scanner stufen eine unbekannte,
+frisch gebaute Setup-Datei deshalb als verdächtig ein — das ist eine Heuristik,
+kein Befund. Drei Dinge helfen, ausführlich in
+[**docs/signieren.md**](docs/signieren.md):
+
+1. **Prüfsumme vergleichen** — `SHA256SUMS.txt` liegt bei jedem Release bei:
+   `Get-FileHash .\AIlightSetup.exe -Algorithm SHA256`
+2. **Portable Fassung nehmen** — `AIlightPortable.zip` entpacken und `AIlight.exe` starten
+3. **Fehlalarm melden** — Microsoft und McAfee haben dafür Formulare; solche
+   Meldungen werden analysiert und meist innerhalb von Tagen korrigiert
+
+> Bitte **nicht** den Virenschutz abschalten oder eine Ausnahme einrichten. Das
+> behebt nichts, sondern öffnet eine Tür.
 
 ## ⌨️ Kurzübersicht
 
@@ -104,6 +132,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1
 | `/copy` | Letzte Antwort in die Zwischenablage |
 | `/save` | Letzte Antwort als `.md` speichern |
 | `/settings` | Einstellungen öffnen |
+| `/welcome` | Die Einführung erneut anzeigen |
 | `/help` | Alle Befehle auflisten |
 | `/quit` | AIlight beenden |
 
@@ -130,6 +159,11 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 <p float="left">
   <img src="docs/bilder/einstellungen-dunkel-konto.png" alt="Einstellungen – Konto (dunkel)" width="45%">
   <img src="docs/bilder/einstellungen-hell-aussehen.png" alt="Einstellungen – Aussehen (hell)" width="45%">
+</p>
+
+<p float="left">
+  <img src="docs/bilder/einfuehrung-dunkel-willkommen.png" alt="Einführung – Willkommen" width="45%">
+  <img src="docs/bilder/einfuehrung-dunkel-fragen.png" alt="Einführung – Fragen stellen" width="45%">
 </p>
 
 *Weitere Bilder in [`docs/bilder/`](docs/bilder) — erzeugt von `AIlight.exe --shot docs\bilder`.*
@@ -176,12 +210,14 @@ src/AIlight/
   MainWindow.*         Die Leiste: Eingabe, Vorschläge, Streaming-Markdown
   SettingsWindow.*     Sieben Bereiche, Live-Vorschau, eigener Rahmen
   AppSettings.cs       Einstellungen laden/speichern (JSON)
-  SelfTest.cs          52 Prüfungen, teils auf Pixel-Ebene
+  WelcomeWindow.*      Die Einführung: sieben Schritte mit Vorführung
+  SelfTest.cs          59 Prüfungen, teils auf Pixel-Ebene
   Commands.cs          Register der Schrägstrich-Befehle
   Suggestions.cs       Vorschlagszeilen unter der Eingabe
   Core/                Hotkey, Einzelinstanz, Schlüsselspeicher, Protokoll, Symbole, Pfade, atomares Schreiben
   Groq/                HTTP-Client, Streaming, Modelle, Verlauf
-  Views/               Markdown-Darstellung, Themen (hell/dunkel), Bildschirmfotos
+  Views/               Markdown-Darstellung, Themen (hell/dunkel), Bewegung
+                       (Motion/Curve/Anim/Glide), Bildschirmfotos
 tools/                 build.ps1, make_icon.py, Messwerkzeuge
 packaging/             ailight.iss (Inno Setup), ailight.ico
 docs/bilder/           Bilder für dieses README
@@ -206,7 +242,8 @@ docs/bilder/           Bilder für dieses README
 | Erstes Antwort-Token | 0,4–0,6 s |
 | Leerlauf-CPU | 0 % |
 | Leerlauf-RAM | ca. 90 MB |
-| Installergröße | 48,5 MB (≈46 MiB, inklusive .NET 8) |
+| Installergröße | 49,4 MB (≈47 MiB, inklusive .NET 8) |
+| Portable-Fassung | 61,3 MB ZIP (144,8 MB entpackt) |
 | Installierte Größe | ca. 152 MB (145 MiB) Programmdateien, mit Deinstallierer 156 MB (149 MiB) |
 
 ## ⚠️ Bekannte Grenzen
@@ -214,14 +251,18 @@ docs/bilder/           Bilder für dieses README
 - **Nur Groq** — ein Anbieter, kein Modell-Marktplatz
 - **Nur Windows 10/11 x64**
 - Konflikte beim Hotkey werden erkannt (Protokoll + Hinweis in der Oberfläche) 
-- Unsigierter Installer → SmartScreen-Hinweis beim ersten Start
+- **Unsignierter Installer** → SmartScreen-Hinweis und gelegentlich ein Fehlalarm
+  eines Virenschutz-Programms. Was dagegen hilft und wie man ihn meldet:
+  [docs/signieren.md](docs/signieren.md). Bis dahin ist
+  `AIlightPortable.zip` der ruhigere Weg
 - Getestet auf dem Windows-10-Konto des Autors — nicht auf frischen virtuellen Maschinen
+- Das Signieren ist vorbereitet, aber mangels Zertifikat noch nicht durchlaufen
 
 ## 🤝 Mitmachen
 
 Fehlerberichte und Pull Requests sind willkommen. Besonders gebraucht:
 
-- Codesignatur / Microsoft-Store-Verpackung
+- Ein Codesignatur-Zertifikat für die Releases (der Bau dafür steht bereit: `tools\build.ps1 -Sign`)
 - Weitere KI-Anbieter (OpenAI, Anthropic, lokal über Ollama)
 - Linux/macOS über Avalonia oder MAUI
 - Weitere Einheitstests für Groq-Client und Verlaufsspeicher
