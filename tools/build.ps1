@@ -107,7 +107,11 @@ if (-not $SkipTest) {
     $test = Start-Process -FilePath $debugExe -ArgumentList '--selftest' -Wait -PassThru `
         -RedirectStandardOutput $log
     Get-Content $log -Encoding UTF8 | Write-Host
-    if ($test.ExitCode -ne 0) { throw 'Selbsttest nicht bestanden — siehe Ausgabe oben.' }
+
+    # Nicht nur der Rückgabewert: die Auswertung verlangt auch die vollständige
+    # Ergebniszeile — dieselbe Datei benutzt der CI-Schritt.
+    & (Join-Path $PSScriptRoot 'verify-selftest.ps1') -Log $log -ExitCode $test.ExitCode
+    if ($LASTEXITCODE -ne 0) { throw 'Selbsttest nicht bestanden — siehe Ausgabe oben.' }
 } else {
     Write-Host "`n=== 2/6  Selbsttest übersprungen ===" -ForegroundColor Yellow
 }

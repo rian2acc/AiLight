@@ -42,12 +42,11 @@ jobs:
           # Gleicher Publish wie tools/build.ps1: self-contained, ohne Trimmen —
           # Trimmen unterstützt WPF/WinForms nicht (NETSDK1175) und kann Laufzeitcode entfernen.
           dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
-          cd dist/publish
-          .\AIlight.exe --selftest
-          # PowerShell reicht den Rückgabewert eines fremden Programms nicht von
-          # selbst durch: ohne diese Zeile wäre der Schritt grün, auch wenn der
-          # Selbsttest rot ist — und eine grüne Anzeige, die nichts bedeutet,
-          # ist schlimmer als gar keine.
+
+          # Ausgewertet wird über den Rückgabewert UND die Ergebniszeile —
+          # Begründung steht in der Datei selbst. Rückgabewert prüfen und
+          # weiterreichen: ohne das wäre der Schritt grün, auch wenn rot.
+          & ./tools/verify-selftest.ps1 -Exe ./dist/publish/AIlight.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test artifact
