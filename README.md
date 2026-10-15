@@ -38,7 +38,7 @@
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
 | **Selbsttest eingebaut** | `AIlight.exe --selftest` → 48 Prüfungen, teils auf Pixel-Ebene |
-| **Installer** | 48,5 MB (46,2 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
+| **Installer** | 48,5 MB (≈46 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
 
 ## 📥 Installation
 
@@ -199,7 +199,7 @@ docs/bilder/           Bilder für dieses README
 | Erstes Antwort-Token | 0,4–0,6 s |
 | Leerlauf-CPU | 0 % |
 | Leerlauf-RAM | ca. 90 MB |
-| Installergröße | 48,5 MB (46,2 MiB, inklusive .NET 8) |
+| Installergröße | 48,5 MB (≈46 MiB, inklusive .NET 8) |
 | Installierte Größe | ca. 152 MB (145 MiB) Programmdateien, mit Deinstallierer 156 MB (149 MiB) |
 
 ## ⚠️ Bekannte Grenzen
