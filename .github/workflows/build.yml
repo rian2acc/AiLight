@@ -44,6 +44,11 @@ jobs:
           dotnet publish src/AIlight/AIlight.csproj -c Release -o dist/publish --self-contained true -r win-x64
           cd dist/publish
           .\AIlight.exe --selftest
+          # PowerShell reicht den Rückgabewert eines fremden Programms nicht von
+          # selbst durch: ohne diese Zeile wäre der Schritt grün, auch wenn der
+          # Selbsttest rot ist — und eine grüne Anzeige, die nichts bedeutet,
+          # ist schlimmer als gar keine.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test artifact
         if: always()

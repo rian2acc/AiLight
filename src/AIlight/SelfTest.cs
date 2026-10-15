@@ -1703,23 +1703,41 @@ public static class SelfTest
                 var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
 
-                // Außerhalb des Bildschirms zeigen: sichtbar wie im Betrieb, ohne Fokus zu klauen.
-                Shot.Show(bar);
-                True(bar.IsVisible, "Die Leiste ließ sich nicht zeigen");
+                // Hier geht es um den weichen Weg. Auf einem Rechner, auf dem Windows
+                // selbst keine Animationen erlaubt (auf Rechnern ohne Bildaufbau der
+                // Fall), verbietet das Haus jede Bewegung — dann verschwindet die Leiste
+                // absichtlich sofort. Damit diese Prüfung nicht davon abhängt, was der
+                // jeweilige Rechner meldet, wird der Systemschalter hier ausdrücklich
+                // ausgenommen; seine eigene Prüfung steht unter „Bewegung“.
+                var wasFollowing = Motion.FollowSystem;
+                var wasEnabled = Motion.Enabled;
+                Motion.FollowSystem = false;
+                Motion.Enabled = true;
+                try
+                {
+                    // Außerhalb des Bildschirms zeigen: sichtbar wie im Betrieb, ohne Fokus zu klauen.
+                    Shot.Show(bar);
+                    True(bar.IsVisible, "Die Leiste ließ sich nicht zeigen");
 
-                bar.YieldToSettings();
+                    bar.YieldToSettings();
 
-                // Sie verschwindet weich — nicht mit einem Schlag.
-                True(bar.IsVisible, "Die Leiste verschwand hart statt weich");
-                True(bar.IsHidingForTest, "Es läuft kein Ausblenden");
+                    // Sie verschwindet weich — nicht mit einem Schlag.
+                    True(bar.IsVisible, "Die Leiste verschwand hart statt weich");
+                    True(bar.IsHidingForTest, "Es läuft kein Ausblenden");
 
-                WaitUntilHidden(bar);
-                True(!bar.IsVisible, "Die Leiste schwebt weiter über den Einstellungen");
-                True(!bar.IsHidingForTest, "Das Ausblenden wurde nicht abgeschlossen");
+                    WaitUntilHidden(bar);
+                    True(!bar.IsVisible, "Die Leiste schwebt weiter über den Einstellungen");
+                    True(!bar.IsHidingForTest, "Das Ausblenden wurde nicht abgeschlossen");
 
-                // Danach steht sie wieder sauber da — der nächste Auftritt beginnt frisch.
-                Equal(1d, Math.Round(bar.ShellOpacityForTest, 3), "Deckkraft in Grundstellung");
-                Equal(0d, Math.Round(bar.ShellShiftForTest, 3), "Auftrieb in Grundstellung");
+                    // Danach steht sie wieder sauber da — der nächste Auftritt beginnt frisch.
+                    Equal(1d, Math.Round(bar.ShellOpacityForTest, 3), "Deckkraft in Grundstellung");
+                    Equal(0d, Math.Round(bar.ShellShiftForTest, 3), "Auftrieb in Grundstellung");
+                }
+                finally
+                {
+                    Motion.Enabled = wasEnabled;
+                    Motion.FollowSystem = wasFollowing;
+                }
 
                 bar.Close();
             }
@@ -1947,12 +1965,26 @@ public static class SelfTest
                 welcome.BackForTest();
                 Equal("aussehen", welcome.VisibleStepForTest, "ein Schritt zurück");
 
-                // Im Fenster: die Vorführung läuft und tippt wirklich.
-                Shot.Show(welcome);
-                welcome.GoToStepForTest("fragen");
-                True(welcome.DemoRunningForTest, "die Vorführung läuft nicht");
-                welcome.DemoStepForTest();
-                True(welcome.DemoQuestionForTest.Length > 0, "die Vorführung tippt nicht");
+                // Im Fenster: die Vorführung läuft und tippt wirklich. Sie läuft nur,
+                // wenn Bewegung erwünscht ist — deshalb wird der Systemschalter für diese
+                // Prüfung ausdrücklich ausgenommen (siehe oben bei „die Leiste tritt zurück“).
+                var wasFollowingDemo = Motion.FollowSystem;
+                var wasEnabledDemo = Motion.Enabled;
+                Motion.FollowSystem = false;
+                Motion.Enabled = true;
+                try
+                {
+                    Shot.Show(welcome);
+                    welcome.GoToStepForTest("fragen");
+                    True(welcome.DemoRunningForTest, "die Vorführung läuft nicht");
+                    welcome.DemoStepForTest();
+                    True(welcome.DemoQuestionForTest.Length > 0, "die Vorführung tippt nicht");
+                }
+                finally
+                {
+                    Motion.Enabled = wasEnabledDemo;
+                    Motion.FollowSystem = wasFollowingDemo;
+                }
 
                 // Der Weiter-Knopf sitzt vollständig im Fenster — nichts abgeschnitten.
                 var next = (Button)welcome.FindName("NextButton")!;
