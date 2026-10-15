@@ -94,20 +94,34 @@ jobs:
 
       # Signieren nur, wenn ein Zertifikat als Repository-Geheimnis hinterlegt ist
       # (SIGNING_PFX_BASE64 + SIGNING_PFX_PASSWORD). Ohne Geheimnis läuft der
-      # Schritt nicht — der Installer ist dann unsigniert, siehe docs/signieren.md.
+      # Schritt durch und überspringt die Signatur — der Installer ist dann
+      # unsigniert, siehe docs/signieren.md.
+      #
+      # Die Geheimnisse kommen als Umgebungsvariablen herein, nicht als
+      # Einsetzung im Skript: Geheimnisse sind im Kontext `secrets` nur an
+      # erlaubten Stellen verfügbar (in `env`, nicht in `if`), und eingesetzte
+      # Werte könnten samt Befehl im Protokoll landen.
       - name: Sign (optional)
-        if: ${{ secrets.SIGNING_PFX_BASE64 != '' }}
         shell: pwsh
+        env:
+          SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          SIGNING_PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
         run: |
+          if ([string]::IsNullOrEmpty($env:SIGNING_PFX_BASE64)) {
+            Write-Host 'Kein Zertifikat hinterlegt — Signatur übersprungen.'
+            exit 0
+          }
           $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String("${{ secrets.SIGNING_PFX_BASE64 }}"))
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw 'signtool.exe wurde nicht gefunden.' }
           foreach ($file in @('dist\publish\AIlight.exe', 'dist\installer\AIlightSetup.exe')) {
-            & $signtool sign /f $pfx /p "${{ secrets.SIGNING_PFX_PASSWORD }}" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $file
+            & $signtool sign /f $pfx /p $env:SIGNING_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $file
             if ($LASTEXITCODE -ne 0) { throw "Signieren fehlgeschlagen: $file" }
             Write-Host "signiert: $file"
           }
+          Remove-Item $pfx -Force -ErrorAction SilentlyContinue
 
       # Die Portable-Fassung enthält dasselbe Programm ohne Installer: wer bei
       # seinem Virenschutz aneckt, kann sie einfach entpacken und starten.
