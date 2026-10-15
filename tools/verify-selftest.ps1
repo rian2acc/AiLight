@@ -78,10 +78,12 @@ else {
     throw 'Bitte -Exe oder -Log angeben.'
 }
 
-# Kein Rückgabewert ist kein gutes Zeichen: Windows PowerShell 5.1 wartet
-# bei einem Fensterprogramm nicht und liefert dann weder Ausgabe noch Code.
-# In diesem Fall wird bewusst rot gemeldet — lieber sichtbar scheitern als
-# still durchwinken. (build.ps1 nimmt deshalb den Weg über -Log.)
+# Kein Rückgabewert ist kein gutes Zeichen. Über -Exe gibt es ihn immer
+# (Start-Process wartet auch bei einem Fensterprogramm); die Prüfung bleibt als
+# letztes Netz für einen Aufruf, der einen Code übergibt, den er nicht hat —
+# lieber sichtbar scheitern als still durchwinken. Windows PowerShell 5.1 gibt
+# bei einem *direkten* Aufruf eines Fensterprogramms weder Ausgabe noch Code
+# zurück; deshalb geht dieses Skript den Weg über eine Datei.
 if ($null -eq $code) {
     Write-Host 'Selbsttest: kein Rückgabewert vom Programm — es ist nicht durchgelaufen.' -ForegroundColor Red
     exit 1
