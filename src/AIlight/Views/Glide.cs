@@ -53,7 +53,8 @@ public sealed class Glide : IDisposable
         _target = clamped;
         _from = from;
         _elapsed = 0;
-        _duration = Math.Max(1, durationMs);
+        // Dieselbe Lebendigkeit wie überall: die Einstellung wirkt auch hier.
+        _duration = Math.Max(1, Motion.Scaled(durationMs));
 
         if (Math.Abs(clamped - from) < 0.5)
         {

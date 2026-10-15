@@ -648,7 +648,8 @@
     <Style x:Key="Suggest.Row" TargetType="Border">
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Row}" />
         <Setter Property="Margin" Value="8,1" />
-        <Setter Property="Height" Value="40" />
+        <!--  Höhe kommt aus den Einstellungen (kompakte Zeilen) — deshalb ein Verweis.  -->
+        <Setter Property="Height" Value="{DynamicResource Suggest.Row.Height}" />
         <Setter Property="Background" Value="Transparent" />
     </Style>
 

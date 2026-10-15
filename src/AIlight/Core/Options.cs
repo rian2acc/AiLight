@@ -11,6 +11,9 @@ public sealed class Options
 
     /// <summary>Die Einführung zeigen, egal ob sie schon gesehen wurde.</summary>
     public bool Welcome { get; private set; }
+
+    /// <summary>Den Rundgang über die Leiste zeigen (die Leiste erscheint mit).</summary>
+    public bool Tour { get; private set; }
     public bool TraceStart { get; private set; }
     public double SmokeSeconds { get; private set; }
     public string Ask { get; private set; } = "";
@@ -27,6 +30,7 @@ public sealed class Options
     public string Summary => SelfTest ? "Selbsttest"
         : Quit ? "Beenden"
         : Welcome ? "Einführung"
+        : Tour ? "Rundgang"
         : Shot.Length > 0 ? "Bildschirmfotos"
         : AskUi.Length > 0 ? "Frage über die Leiste"
         : Ask.Length > 0 ? "Einzelfrage"
@@ -49,6 +53,9 @@ public sealed class Options
                     break;
                 case "--welcome":
                     options.Welcome = true;
+                    break;
+                case "--tour":
+                    options.Tour = true;
                     break;
                 case "--trace-start":
                     options.TraceStart = true;

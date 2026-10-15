@@ -1,4 +1,4 @@
-# AIlight
+﻿# AIlight
 
 <p align="center">
   <img src="docs/bilder/logo.png" alt="AIlight-Logo: ein Lichtpunkt, aus dem drei Strahlen nach unten gehen — die beiden äußeren ergeben mit dem Querstrich ein A, der mittlere Strahl ist das I" width="120" height="120">
@@ -29,10 +29,12 @@
 | Funktion | Beschreibung |
 |----------|--------------|
 | **Globaler Hotkey** | `Alt+Space` (frei wählbar) — sofort da, aus jedem Programm |
-| **Streaming-Antworten** | Der Text erscheint Wort für Wort über die Groq-API |
+| **Dreizehn Anbieter** | Groq, OpenAI, Anthropic (Claude), Google Gemini, Mistral, DeepSeek, xAI, OpenRouter, Together, Perplexity, Azure — und lokale Server (Ollama, LM Studio); Schlüssel getrennt je Anbieter |
+| **Streaming-Antworten** | Der Text erscheint Wort für Wort — in der Sprechweise des Anbieters (OpenAI-kompatibel, Anthropic oder Gemini) |
 | **Smarte Vorschläge** | Frühere Fragen, Befehle, Zwischenablage — per Tastatur bedienbar |
 | **Nur das Gespräch** | Wird eine Frage abgeschickt, klappen die Vorschläge weg: der Platz gehört der Antwort. Beim Tippen sind sie sofort wieder da |
 | **Einführung beim ersten Start** | Sieben Schritte, die alles erklären — mit mitlaufender Vorführung; später jederzeit über `/welcome` |
+| **Rundgang an der Leiste selbst** | Nach der Einführung dunkelt der Bildschirm ab, und ein Loch wandert über Zeichen, Eingabe, Vorschläge und Fußzeile — nur ein Rechteck bewegt sich, sonst nichts; später jederzeit über `/rundgang` |
 | **Neue Marke** | Leuchtender Punkt oben, drei Strahlen nach unten — die äußeren ergeben mit dem Querstrich ein **A**, der mittlere ist das **I** |
 | **macOS-Look** | Ruhige Flächen, Haarlinien, großzügige Ecken, ein Lichtschein von oben, Ampel-Knöpfe in den Einstellungen |
 | **Überall weich** | Auftritt der Leiste, Seitenwechsel, Hover, Regler, Markierung, Antwortabsätze und Listenzeilen: alles blendet über statt umzuspringen |
@@ -42,11 +44,11 @@
 | **Drei Punkte statt eines Blinkers** | Solange geantwortet wird, leuchten drei Punkte der Reihe nach auf |
 | **Hört auf Windows** | Ist in Windows „Animationen“ abgeschaltet, bewegt sich auch AIlight nicht mehr — und in den Einstellungen lässt sich die Bewegung zusätzlich ausschalten |
 | **Schwebt nie im Weg** | Öffnen die Einstellungen, zieht sich die Leiste zurück — und holt sich dabei keinen fremden Fokus |
-| **Alles anpassbar** | Akzentfarbe (9 macOS-Töne), Ecken-Radius, Schrift, Breite/Höhe/Deckkraft, Bewegung, Fußzeile |
+| **Alles anpassbar** | Anbieter, Modell (oder eigener Name), Temperatur, Top-P, Höchstlänge, Strom, Denk-Schritte, Wartezeit, Versuche, Akzentfarbe (9 macOS-Töne), Ecken-Radius, Schrift, Code-Schrift, Breite/Höhe/Deckkraft, **Stärke der Bewegung**, Schatten, Vorschlagszahl, kompakte Zeilen, Fußzeile |
 | **Gesprächsgedächtnis** | Einstellbare Runden, `/forget` löscht |
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
-| **Selbsttest eingebaut** | `AIlight.exe --selftest` → **59 Prüfungen**, teils auf Pixel-Ebene |
+| **Selbsttest eingebaut** | `AIlight.exe --selftest` → **83 Prüfungen**, teils auf Pixel-Ebene |
 | **Installer** | 49,4 MB (≈47 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
 | **Portable Fassung** | Dieselbe Version als `AIlightPortable.zip` — entpacken und starten, ohne Installer |
 | **Prüfsummen** | `SHA256SUMS.txt` liegt bei jedem Release bei |
@@ -58,7 +60,8 @@
 1. **`AIlightSetup.exe`** aus der [neuesten Fassung](https://github.com/rian2acc/AiLight/releases/latest) laden (49,4 MB)
 2. Ausführen — installiert nach `%LOCALAPPDATA%\AIlight`, legt Startmenü-Eintrag und Autostart an
 3. Die **Einführung** führt durch die sieben Schritte und fragt dabei nach dem Schlüssel
-4. `Alt+Space` drücken und fragen
+4. Danach zeigt sich die Leiste, und der **Rundgang** geht ihre Teile ab — Klick, `Enter` oder `Esc`
+5. `Alt+Space` drücken und fragen
 
 ### Variante B: Portable (ohne Installer)
 
@@ -133,6 +136,7 @@ kein Befund. Drei Dinge helfen, ausführlich in
 | `/save` | Letzte Antwort als `.md` speichern |
 | `/settings` | Einstellungen öffnen |
 | `/welcome` | Die Einführung erneut anzeigen |
+| `/rundgang` | Die Leiste Schritt für Schritt zeigen (Abdunklung mit Loch) |
 | `/help` | Alle Befehle auflisten |
 | `/quit` | AIlight beenden |
 
@@ -178,14 +182,14 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 | Letzte Antwort | `%APPDATA%\AIlight\last_answer.md` |
 | Gespeicherte Antworten | `%USERPROFILE%\Documents\AIlight-Antworten` |
 | Protokoll (rollierend, 4 Dateien) | `%LOCALAPPDATA%\AIlight\logs\ailight.log` |
-| API-Schlüssel | **Windows-Anmeldeinformationsspeicher** → `AIlight:groq-api-key` |
+| API-Schlüssel | **Windows-Anmeldeinformationsspeicher** → `AIlight:<anbieter>-api-key` (Groq weiter unter `AIlight:groq-api-key`) |
 
 > Deinstallieren lässt Einstellungen, Verlauf und Schlüssel stehen. Neu installieren = sofort weiterarbeiten.
 
 ## 🛠️ Eingebaute Diagnose
 
 ```powershell
-AIlight.exe --selftest           # 52 Prüfungen, Rückgabewert 0 = bestanden
+AIlight.exe --selftest           # 83 Prüfungen, Rückgabewert 0 = bestanden
 AIlight.exe --smoke 4            # Leiste, Hotkey, Infobereich, Größe, Position
 AIlight.exe --ask "Sag: ok"      # Frage ohne Fenster
 AIlight.exe --ask-ui "2+2?"      # Simulierte Bedienung der Leiste
@@ -211,11 +215,14 @@ src/AIlight/
   SettingsWindow.*     Sieben Bereiche, Live-Vorschau, eigener Rahmen
   AppSettings.cs       Einstellungen laden/speichern (JSON)
   WelcomeWindow.*      Die Einführung: sieben Schritte mit Vorführung
-  SelfTest.cs          59 Prüfungen, teils auf Pixel-Ebene
+  Views/Spotlight.cs   Der Rundgang: Abdunklung mit wanderndem Loch und Karte
+  SelfTest.cs          83 Prüfungen, teils auf Pixel-Ebene
   Commands.cs          Register der Schrägstrich-Befehle
   Suggestions.cs       Vorschlagszeilen unter der Eingabe
   Core/                Hotkey, Einzelinstanz, Schlüsselspeicher, Protokoll, Symbole, Pfade, atomares Schreiben
-  Groq/                HTTP-Client, Streaming, Modelle, Verlauf
+  Ai/                  Anbieterkatalog, Anfrageaufbau, drei Klienten
+                       (OpenAI-kompatibel, Anthropic, Gemini), Ereignisstrom
+  Chat/                Chatdienst, Gesprächsgedächtnis, Verlauf
   Views/               Markdown-Darstellung, Themen (hell/dunkel), Bewegung
                        (Motion/Curve/Anim/Glide), Bildschirmfotos
 tools/                 build.ps1, make_icon.py, Messwerkzeuge
@@ -227,7 +234,8 @@ docs/bilder/           Bilder für dieses README
 
 - **Ein Programm**, self-contained — kein Hintergrunddienst, kein Plugin-System
 - **Vorbereitete Leiste** entsteht im Leerlauf → erster Hotkey in 6–40 ms
-- **Direkt zur Groq-API** — kein Zwischenserver, keine Telemetrie
+- **Direkt zum gewählten Anbieter** — kein Zwischenserver, keine Telemetrie
+- **Drei Sprechweisen statt eines Anbieters** — der Katalog entscheidet, welcher Klient gefragt wird; die Oberfläche kennt keine Anbieternamen
 - **Selbsttest steckt in der EXE** — geprüft wird genau das, was Nutzer starten
 - **Schlüssel im Anmeldeinformationsspeicher** — berührt nie die Festplatte
 - **macOS-inspiriertes Designsystem** — eine Themendatei steuert Farben, Radien und Schrift; jedes Fenster folgt live
@@ -248,7 +256,7 @@ docs/bilder/           Bilder für dieses README
 
 ## ⚠️ Bekannte Grenzen
 
-- **Nur Groq** — ein Anbieter, kein Modell-Marktplatz
+- **Vorschläge für Modelle, keine Wahrheit** — Anbieter benennen ihre Modelle um; der Katalog ist der Stand beim Schreiben, jeder Name lässt sich eintippen oder direkt vom Anbieter laden
 - **Nur Windows 10/11 x64**
 - Konflikte beim Hotkey werden erkannt (Protokoll + Hinweis in der Oberfläche) 
 - **Unsignierter Installer** → SmartScreen-Hinweis und gelegentlich ein Fehlalarm
@@ -263,9 +271,9 @@ docs/bilder/           Bilder für dieses README
 Fehlerberichte und Pull Requests sind willkommen. Besonders gebraucht:
 
 - Ein Codesignatur-Zertifikat für die Releases (der Bau dafür steht bereit: `tools\build.ps1 -Sign`)
-- Weitere KI-Anbieter (OpenAI, Anthropic, lokal über Ollama)
+- Weitere Anbieter und Sprechweisen (z. B. Bedrock, Vertex, eigene Gateways)
 - Linux/macOS über Avalonia oder MAUI
-- Weitere Einheitstests für Groq-Client und Verlaufsspeicher
+- Weitere Einheitstests für die Anbieter-Klienten und den Verlaufsspeicher
 - Übersetzungen (Oberfläche und Kommentare sind auf Deutsch)
 
 ```powershell

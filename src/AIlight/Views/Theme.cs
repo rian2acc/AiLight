@@ -111,7 +111,7 @@ public static class Theme
         => key is "system" or "segoe" or "calibri" or "arial";
 
     public static void Apply(string themeSetting, string accentHex, double opacity,
-        double radius = 16, string font = "system")
+        double radius = 16, string font = "system", bool compactRows = false)
     {
         var dark = IsDarkMode(themeSetting);
         var palette = dark ? Dark : Light;
@@ -139,6 +139,10 @@ public static class Theme
 
         ApplyRadius(resources, radius);
         resources["Font.Ui"] = FontStack(font);
+
+        // Höhe einer Zeile der Vorschlagsliste: die Einstellung „kompakte Zeilen“
+        // wirkt damit auf jede Zeile, ohne dass die Vorlage sie kennen muss.
+        resources["Suggest.Row.Height"] = compactRows ? 32d : 40d;
     }
 
     /// <summary>

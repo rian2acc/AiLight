@@ -1,4 +1,4 @@
-; AIlight — Installer (Inno Setup 6)
+﻿; AIlight — Installer (Inno Setup 6)
 ;
 ; Ziel: Ein Freund lädt eine Datei, führt sie aus, und danach läuft das Programm.
 ; Keine Administratorrechte, keine .NET-Installation (die Anwendung bringt alles
@@ -26,7 +26,7 @@
 ; auffällig und schneller entpackbar.
 
 #define AppName "AIlight"
-#define AppVersion "2.4.0"
+#define AppVersion "3.0.0"
 #define AppPublisher "AIlight"
 #define AppPublisherUrl "https://github.com/rian2acc/AiLight"
 #define AppSupportUrl "https://github.com/rian2acc/AiLight/issues"
@@ -106,7 +106,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app
 
 [Run]
 ; Nach der Installation gleich starten: Beim ersten Start öffnet sich das
-; Einstellungsfenster und fragt nach dem Groq-Schlüssel.
+; Einstellungsfenster und fragt nach einem Schlüssel für den Anbieter.
 Filename: "{app}\{#AppExe}"; Description: "AIlight jetzt starten"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]

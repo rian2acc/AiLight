@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -9,8 +9,9 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using AIlight.Ai;
 using AIlight.Core;
-using AIlight.Groq;
+using AIlight.Chat;
 using AIlight.Views;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using Point = System.Windows.Point;
@@ -76,6 +77,9 @@ public partial class MainWindow : Window
     private int _selected;
     private IntPtr _previousWindow;
     private DateTime _startedAt;
+
+    /// <summary>Der laufende Rundgang über die eigene Leiste — sonst null.</summary>
+    private SpotlightOverlay? _tour;
 
     public MainWindow(ChatService chat)
     {
@@ -263,6 +267,40 @@ public partial class MainWindow : Window
     /// <summary>Zeitpunkt des letzten Einblendens (für Messungen).</summary>
     public DateTime ShownAt { get; private set; }
 
+    /// <summary>Wo die Leiste selbst auf dem Bildschirm steht — für Bilder und Prüfstand.</summary>
+    internal Rect RootRectOnScreen => ScreenRect(Root);
+
+    /// <summary>Läuft gerade der Rundgang? (Prüfstand)</summary>
+    internal SpotlightOverlay? TourForTest => _tour;
+
+    /// <summary>Die Halte, die der Rundgang jetzt zeigen würde. (Prüfstand)</summary>
+    internal IReadOnlyList<TourStop> TourStopsForTest => TourPlan();
+
+    /// <summary>
+    /// Dieselben Halte in Koordinaten der Leiste selbst — für Bilder, die noch
+    /// kein Fenster haben. Derselbe Rand wie im Bild: <see cref="Shot"/> zeichnet
+    /// die gemessene Leiste samt dem Rand ihres Aufbaus (siehe InBitmap im Selbsttest).
+    /// </summary>
+    internal IReadOnlyList<TourStop> TourStopsInBar() => TourPlan(RectInRoot);
+
+    private Rect RectInRoot(FrameworkElement element)
+    {
+        if (element.ActualWidth < 1 || element.ActualHeight < 1)
+        {
+            return Rect.Empty;
+        }
+
+        var point = element.TransformToAncestor(Root).Transform(new Point(0, 0));
+        return new Rect(
+            point.X + Root.Margin.Left,
+            point.Y + Root.Margin.Top,
+            element.ActualWidth,
+            element.ActualHeight);
+    }
+
+    /// <summary>Rundgang starten, ohne auf ein Fenster zu warten. (Prüfstand)</summary>
+    internal void StartTourForTest() => StartTour();
+
     // ── Fenster-Grundlagen ──────────────────────────────────────────────────
 
     private void OnSourceInitialized(object sender, EventArgs e)
@@ -287,10 +325,14 @@ public partial class MainWindow : Window
         Motion.Enabled = _settings.AnimateBar;
 
         Theme.Apply(_settings.Theme, _settings.Accent, _settings.Opacity,
-            _settings.CornerRadius, _settings.FontFamily);
+            _settings.CornerRadius, _settings.FontFamily, _settings.CompactRows);
         Width = _settings.WindowWidth;
         Input.FontSize = _settings.FontSize;
         Placeholder.FontSize = _settings.FontSize;
+
+        // Der Schatten ist Geschmackssache (und auf schwachen Rechnern eine Last):
+        // fehlt er, muss die Kante über den Rahmen allein stehen.
+        ShadowLayer.Visibility = _settings.ShowShadow ? Visibility.Visible : Visibility.Collapsed;
 
         // Die Fußzeile schließt unten mit demselben Radius ab wie das Fenster.
         var shell = Math.Clamp(_settings.CornerRadius, 8, 22);
@@ -374,6 +416,121 @@ public partial class MainWindow : Window
                 Input.Focus();
             }
         }));
+    }
+
+    /// <summary>
+    /// Der Rundgang: die Leiste erklärt sich an sich selbst. Über allem legt
+    /// sich eine Abdunklung mit einem Loch, und das Loch wandert von Element zu
+    /// Element — die Leiste darunter bleibt stehen und wird nicht angefasst.
+    ///
+    /// Er läuft nur einmal je Aufruf: wer schon mittendrin ist, bekommt keinen
+    /// zweiten. Am Ende steht die Tastatur wieder in der Eingabezeile.
+    /// </summary>
+    public void StartTour()
+    {
+        if (_tour is not null)
+        {
+            return;
+        }
+
+        var stops = TourPlan();
+        if (stops.Count == 0)
+        {
+            return;
+        }
+
+        var bounds = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+
+        var tour = new SpotlightOverlay(bounds, stops, () =>
+        {
+            _tour = null;
+            if (IsVisible)
+            {
+                Activate();
+                Input.Focus();
+            }
+        });
+
+        _tour = tour;
+        Log.Info($"Rundgang gestartet: {stops.Count} Halte ({string.Join(", ", stops.Select(s => s.Key))})");
+        tour.Show();
+        tour.Begin();
+
+        // Die Leiste holt sich den Fokus gleich noch einmal (ihr Auftritt läuft in
+        // einem eigenen Durchgang). Der Rundgang liegt darüber und muss die Tastatur
+        // behalten, sonst wirkt „Esc“ nicht — also danach noch einmal aktivieren.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            if (_tour is not null && _tour.IsVisible)
+            {
+                _tour.Activate();
+            }
+        }));
+    }
+
+    /// <summary>
+    /// Die Halte des Rundgangs — in der Reihenfolge, in der sie erklärt werden.
+    /// Was gerade nicht im Bild steht (etwa die Vorschläge nach einer Antwort),
+    /// fällt weg: lieber drei ehrliche Halte als ein Loch um nichts.
+    /// </summary>
+    private List<TourStop> TourPlan(Func<FrameworkElement, Rect>? where = null)
+    {
+        var at = where ?? ScreenRect;
+        var plan = new List<TourStop>();
+        AddTourStop(plan, at, "marke", "Das Zeichen",
+            "Hier wartet AIlight. Dasselbe Symbol sitzt im Infobereich — ein Klick darauf holt die Leiste zurück, "
+            + "ganz ohne Tastenkürzel.", BrandChip);
+        AddTourStop(plan, at, "eingabe", "Frage stellen",
+            "Einfach lostippen und Enter drücken. Sobald die Frage läuft, verschwinden die Vorschläge — "
+            + "dann gehört die ganze Leiste dem Gespräch.", Input);
+        AddTourStop(plan, at, "vorschlaege", "Vorschläge",
+            "Befehle mit / und deine letzten Fragen stehen hier bereit: mit den Pfeiltasten wählen, Enter öffnet. "
+            + "Tippst du etwas, bleibt genau das übrig, was dazu passt.", SuggestionBox);
+        AddTourStop(plan, at, "fusszeile", "Fußzeile",
+            "Links steht, was gerade gilt, rechts Modell und Tokens nach einer Antwort. Esc schließt die Leiste von überall.",
+            Footer);
+        return plan;
+    }
+
+    private void AddTourStop(List<TourStop> plan, Func<FrameworkElement, Rect> at, string key, string title,
+        string text, FrameworkElement element)
+    {
+        var rect = at(element);
+        if (rect.IsEmpty)
+        {
+            return;
+        }
+
+        plan.Add(new TourStop(key, title, text, rect));
+    }
+
+    /// <summary>
+    /// Wo ein Element wirklich auf dem Bildschirm steht — in geräteunabhängigen
+    /// Einheiten, denn in diesen rechnet auch die Abdunklung. Ein verstecktes
+    /// oder noch nicht gemessenes Element hat keinen Platz; dann kommt nichts zurück.
+    /// </summary>
+    private Rect ScreenRect(FrameworkElement element)
+    {
+        if (!element.IsVisible || element.ActualWidth < 1 || element.ActualHeight < 1)
+        {
+            return Rect.Empty;
+        }
+
+        var topLeft = element.PointToScreen(new Point(0, 0));
+        var bottomRight = element.PointToScreen(new Point(element.ActualWidth, element.ActualHeight));
+        var scale = DeviceScale;
+        var scaleX = scale.X <= 0 ? 1 : scale.X;
+        var scaleY = scale.Y <= 0 ? 1 : scale.Y;
+
+        return new Rect(
+            topLeft.X / scaleX,
+            topLeft.Y / scaleY,
+            (bottomRight.X - topLeft.X) / scaleX,
+            (bottomRight.Y - topLeft.Y) / scaleY);
     }
 
     private void PlaceWindow()
@@ -529,6 +686,13 @@ public partial class MainWindow : Window
 
     private void OnDeactivated(object sender, EventArgs e)
     {
+        // Der Rundgang übernimmt den Fokus — die Leiste gehört ihm und darf sich
+        // nicht unter ihm wegziehen.
+        if (_tour is not null)
+        {
+            return;
+        }
+
         if (!_settings.HideOnLostFocus)
         {
             return;
@@ -546,6 +710,11 @@ public partial class MainWindow : Window
     private void OnHideLater(object? sender, EventArgs e)
     {
         _hideLater?.Stop();
+        if (_tour is not null)
+        {
+            return;
+        }
+
         if (!IsActive && IsVisible)
         {
             HideBar();
@@ -1020,6 +1189,10 @@ public partial class MainWindow : Window
                 ((App)Application.Current).OpenWelcome();
                 break;
 
+            case "rundgang":
+                StartTour();
+                break;
+
             case "help":
                 ShowText("Befehle", HelpText());
                 break;
@@ -1061,26 +1234,32 @@ public partial class MainWindow : Window
         Input.Focus();
     }
 
+    /// <summary>
+    /// Das Modell wechseln: „auto“, „schnell“, „stark“ — oder der Name eines
+    /// Modells, wie ihn der Anbieter kennt. Das gilt immer für den Anbieter, mit
+    /// dem gerade gesprochen wird.
+    /// </summary>
     private void SwitchModel(string argument)
     {
+        var provider = _chat.Provider;
         var value = argument.Trim().ToLowerInvariant();
         var choice = value switch
         {
-            "" or "auto" => GroqModels.Auto,
-            "20b" or "klein" or "schnell" => GroqModels.Small.Id,
-            "120b" or "gross" or "groß" or "stark" => GroqModels.Large.Id,
-            _ => "",
+            "" or "auto" => Providers.Auto,
+            "klein" or "schnell" or "fast" => provider.Fast.Id,
+            "gross" or "groß" or "stark" or "strong" => provider.Strong.Id,
+            _ => argument.Trim(),
         };
 
         if (choice.Length == 0)
         {
-            SetHint("Bitte /model auto, /model 20b oder /model 120b.");
+            SetHint($"Bitte /model auto, /model schnell oder ein Name von {provider.Name}.");
             return;
         }
 
-        _settings.Model = choice;
-        var label = choice == GroqModels.Auto ? "automatisch" : GroqModels.ById(choice).Label;
-        SetHint($"Modell: {label}");
+        _settings.SetModelFor(provider.Id, choice);
+        var label = choice == Providers.Auto ? "automatisch" : provider.Model(choice).Label;
+        SetHint($"{provider.Name}: {label}");
         RefreshSuggestions();
     }
 
@@ -1143,7 +1322,7 @@ public partial class MainWindow : Window
 
             - Antworten im Verlauf: **{count}**
             - Tokens gesamt: **{tokensIn} → {tokensOut}**
-            - Geschätzte Kosten: **{GroqModels.FormatCost(cost)}**
+            - Geschätzte Kosten: **{Providers.FormatCost(cost)}**
             - Verlaufsdatei: **{bytes / 1024.0:0.0} kB**
             """;
         ShowText("Statistik", text);
@@ -1227,7 +1406,13 @@ public partial class MainWindow : Window
         HideSuggestions();
         Anim.Pulse(BrandChip, 1.07, 320, Motion.Spring);
 
-        Input.Clear();
+        // Das Feld wird nur geleert, wenn es so eingestellt ist — wer nachfragt,
+        // behält die Frage dann stehen.
+        if (_settings.ClearInputAfterSend)
+        {
+            Input.Clear();
+        }
+
         _revealedBlocks = 0;
         InvalidateAnswer();
         _answer.Clear();
@@ -1273,9 +1458,14 @@ public partial class MainWindow : Window
 
             FinishStreaming(result);
         }
-        catch (GroqException ex)
+        catch (AiException ex)
         {
-            FinishStreaming(null, ex.Message);
+            // Bei einem Fehler, der sich wiederholen lohnt, sagen wir es — sonst
+            // nicht: „Enter fragt erneut“ hätte bei einem abgelehnten Schlüssel
+            // keinen Sinn.
+            FinishStreaming(null, ex.Retryable
+                ? ex.Message + " Enter fragt erneut."
+                : ex.Message);
         }
         catch (Exception ex)
         {
@@ -1347,8 +1537,13 @@ public partial class MainWindow : Window
         {
             result.Model[(result.Model.LastIndexOf('/') + 1)..],
             $"{result.InputTokens} → {result.OutputTokens} Tokens",
-            GroqModels.FormatCost(result.CostUsd),
         };
+
+        // Nur wenn ein Preis bekannt ist — sonst stünde dort eine Zahl, die niemand kennt.
+        if (result.CostUsd > 0)
+        {
+            parts.Add(Providers.FormatCost(result.CostUsd));
+        }
 
         if (result.Duration > TimeSpan.Zero)
         {
@@ -1478,7 +1673,7 @@ public partial class MainWindow : Window
         _renderedThinking = thinking;
         AnswerRenderCountForTest++;
 
-        var blocks = Markdown.Render(text, _settings.FontSize);
+        var blocks = Markdown.Render(text, _settings.FontSize, _settings.CodeFontSize);
         var shown = Math.Clamp(_revealedBlocks, 0, blocks.Count);
         AnswerPanel.Children.Clear();
         foreach (var block in blocks)

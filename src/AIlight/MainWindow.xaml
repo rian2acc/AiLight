@@ -36,7 +36,7 @@
         </Grid.RenderTransform>
 
         <!-- Nur der Schatten: liegt hinter dem Inhalt, damit die Schrift scharf bleibt. -->
-        <Border Style="{StaticResource Chrome.ShadowLayer}" />
+        <Border x:Name="ShadowLayer" Style="{StaticResource Chrome.ShadowLayer}" />
 
         <Border x:Name="Shell" Style="{StaticResource Chrome.Shell}">
             <Grid>
@@ -257,7 +257,8 @@
                                                             Storyboard.TargetName="RowGlow"
                                                             Storyboard.TargetProperty="Opacity"
                                                             To="1"
-                                                            Duration="0:0:0.12" />
+                                                            Duration="0:0:0.13"
+                                                            EasingFunction="{StaticResource Ease.Out}" />
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.EnterActions>
@@ -268,7 +269,8 @@
                                                             Storyboard.TargetName="RowGlow"
                                                             Storyboard.TargetProperty="Opacity"
                                                             To="0"
-                                                            Duration="0:0:0.2" />
+                                                            Duration="0:0:0.22"
+                                                            EasingFunction="{StaticResource Ease.In}" />
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.ExitActions>

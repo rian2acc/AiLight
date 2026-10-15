@@ -162,10 +162,121 @@
                                 <TextBlock
                                     Margin="2,0,0,10"
                                     Style="{StaticResource Subtitle}"
-                                    Text="AIlight braucht einen eigenen API-Schlüssel von Groq. Alles andere läuft ohne Konto." />
+                                    Text="AIlight rechnet nicht selbst: es fragt ein Modell. Welcher Anbieter das ist, wählst du hier — lokal laufende Modelle brauchen nicht einmal einen Schlüssel." />
 
                                 <Border Style="{StaticResource Card}">
                                     <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Label}" Text="Anbieter" />
+                                            <ComboBox
+                                                x:Name="ProviderBox"
+                                                Grid.Column="1"
+                                                SelectionChanged="OnProviderChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="ProviderInfoText"
+                                            Margin="164,8,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Adresse" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Leer lassen für die Standardadresse." />
+                                            </StackPanel>
+                                            <TextBox
+                                                x:Name="BaseUrlBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                LostFocus="OnControlChanged"
+                                                Style="{StaticResource Field.Text}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="BaseUrlHint"
+                                            Margin="164,8,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Wartezeit" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Wie lange auf die erste Antwort gewartet wird." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="TimeoutSlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="600"
+                                                Minimum="10"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="TimeoutValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Versuche" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Wiederholungen bei „zu viele Anfragen“ oder Serverfehlern." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="RetrySlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="6"
+                                                Minimum="1"
+                                                SmallChange="1"
+                                                Style="{StaticResource Slider.Slim}"
+                                                TickFrequency="1"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="RetryValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Title}" Text="Schlüssel" />
+                                        <TextBlock
+                                            x:Name="KeyHint"
+                                            Margin="0,6,0,10"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="164" />
@@ -192,6 +303,11 @@
                                                 Content="Schlüssel erstellen"
                                                 Style="{StaticResource Button.Ghost}" />
                                             <Button
+                                                x:Name="LoadModelsButton"
+                                                Click="OnLoadModels"
+                                                Content="Modelle laden"
+                                                Style="{StaticResource Button.Ghost}" />
+                                            <Button
                                                 Click="OnDeleteKey"
                                                 Content="Entfernen"
                                                 Style="{StaticResource Button.Danger}" />
@@ -201,10 +317,14 @@
                                             Margin="164,10,0,0"
                                             Style="{StaticResource Caption}"
                                             Text="" />
+                                        <TextBlock
+                                            x:Name="ModelStatus"
+                                            Margin="164,6,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
                                         <Border Style="{StaticResource Line}" Margin="0,12,0,6" />
                                         <TextBlock Style="{StaticResource Caption}">
-                                            <Run Text="Der Schlüssel liegt im Windows-Anmeldeinformationsspeicher — in keiner Datei und in keinem Protokoll. Einen kostenlosen Schlüssel gibt es auf " />
-                                            <Run FontFamily="{DynamicResource Font.Mono}" Text="console.groq.com/keys" />
+                                            <Run Text="Der Schlüssel liegt im Windows-Anmeldeinformationsspeicher — in keiner Datei und in keinem Protokoll. Jeder Anbieter hat seinen eigenen Eintrag; ein Wechsel lässt die anderen unangetastet. „Schlüssel erstellen“ öffnet die Seite des gewählten Anbieters." />
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
@@ -215,7 +335,7 @@
                                         <TextBlock
                                             Margin="0,6,0,0"
                                             Style="{StaticResource Subtitle}"
-                                            Text="Keine Anmeldung, kein Konto, keine Zwischenstation: die Frage geht von diesem Rechner direkt an Groq. Der Verlauf bleibt lokal." />
+                                            Text="Keine Anmeldung bei AIlight, kein Konto, keine Zwischenstation: die Frage geht von diesem Rechner direkt an den gewählten Anbieter. Der Verlauf bleibt lokal." />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -234,12 +354,44 @@
                                                 <ColumnDefinition Width="164" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Style="{StaticResource Label}" Text="Modell" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Modell" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="„Automatisch“ nimmt das schnelle Modell und bei längeren Fragen das stärkere." />
+                                            </StackPanel>
                                             <ComboBox
                                                 x:Name="ModelBox"
                                                 Grid.Column="1"
-                                                SelectionChanged="OnControlChanged"
+                                                VerticalAlignment="Top"
+                                                SelectionChanged="OnModelChanged"
                                                 Style="{StaticResource Box.Select}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="ModelInfoText"
+                                            Margin="164,8,0,0"
+                                            Style="{StaticResource Caption}"
+                                            Text="" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Eigener Modellname" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Überschreibt die Auswahl — für Modelle, die hier noch nicht stehen." />
+                                            </StackPanel>
+                                            <TextBox
+                                                x:Name="ModelNameBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                LostFocus="OnModelNameChanged"
+                                                Style="{StaticResource Field.Text}" />
                                         </Grid>
                                         <Border Style="{StaticResource Line}" Margin="0,10" />
                                         <Grid>
@@ -275,10 +427,102 @@
                                                 Style="{StaticResource Box.Select}" />
                                         </Grid>
                                         <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Temperatur" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Niedrig = sachlich und gleichbleibend, hoch = einfallsreicher." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="TempSlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="2"
+                                                Minimum="0"
+                                                SmallChange="0.1"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="TempValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Top-P" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="1 = alle Wörter erlaubt. Wird nur gesendet, wenn der Regler darunter steht." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="TopPSlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="1"
+                                                Minimum="0.05"
+                                                SmallChange="0.05"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="TopPValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Höchstlänge" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Obergrenze in Tokens. Leer oder 0 = aus der Stufe oben." />
+                                            </StackPanel>
+                                            <TextBox
+                                                x:Name="MaxTokensBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                LostFocus="OnControlChanged"
+                                                Style="{StaticResource Field.Text}" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <CheckBox
+                                            x:Name="StreamingCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Antwort Stück für Stück zeigen (Strom)"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="ThinkingExtCheck"
+                                            Margin="0,0,0,10"
+                                            Checked="OnControlChanged"
+                                            Content="Erweiterte Denk-Schritte ausdrücklich anfordern"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
                                         <CheckBox
                                             x:Name="WebSearchCheck"
                                             Checked="OnControlChanged"
-                                            Content="Websuche erlauben (Groq browser_search, nur gpt-oss)"
+                                            Content="Websuche erlauben (nur bei Anbietern, die sie anbieten)"
                                             Style="{StaticResource Switch}"
                                             Unchecked="OnControlChanged" />
                                     </StackPanel>
@@ -327,7 +571,34 @@
                                                 SelectionChanged="OnControlChanged"
                                                 Style="{StaticResource Box.Select}" />
                                         </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Einträge im Verlauf" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Ältere Antworten fallen weg, sobald die Liste voll ist." />
+                                            </StackPanel>
+                                            <ComboBox
+                                                x:Name="HistoryBox"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                SelectionChanged="OnControlChanged"
+                                                Style="{StaticResource Box.Select}" />
+                                        </Grid>
                                         <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <CheckBox
+                                            x:Name="ClearInputCheck"
+                                            Margin="0,0,0,12"
+                                            Checked="OnControlChanged"
+                                            Content="Eingabefeld nach dem Senden leeren"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
                                         <WrapPanel>
                                             <Button
                                                 Click="OnClearConversation"
@@ -424,6 +695,43 @@
                                             x:Name="LogCheck"
                                             Checked="OnControlChanged"
                                             Content="Protokolldatei schreiben (nur Ereignisse und Fehler)"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Vorschläge" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Wie viele Zeilen die Liste höchstens zeigt (0 = keine)." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="SuggestionSlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="12"
+                                                Minimum="0"
+                                                SmallChange="1"
+                                                Style="{StaticResource Slider.Slim}"
+                                                TickFrequency="1"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="SuggestionValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <CheckBox
+                                            x:Name="CompactCheck"
+                                            Checked="OnControlChanged"
+                                            Content="Kompakte Zeilen in der Vorschlagsliste"
                                             Style="{StaticResource Switch}"
                                             Unchecked="OnControlChanged" />
                                         <Border Style="{StaticResource Line}" Margin="0,12,0,10" />
@@ -604,6 +912,35 @@
                                                 SelectionChanged="OnControlChanged"
                                                 Style="{StaticResource Box.Select}" />
                                         </Grid>
+                                        <Border Style="{StaticResource Line}" Margin="0,10" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Schrift im Code" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="Gilt für Codeblöcke in der Antwort." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="CodeFontSlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="20"
+                                                Minimum="10"
+                                                SmallChange="1"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="CodeFontValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
 
@@ -613,6 +950,34 @@
                                             Margin="0,2,0,10"
                                             Style="{StaticResource Title}"
                                             Text="Bewegung und Antwort" />
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="164" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="58" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Label}" Text="Stärke der Bewegung" />
+                                                <TextBlock
+                                                    Margin="0,3,0,0"
+                                                    Style="{StaticResource Caption}"
+                                                    Text="1 = Haus. Weniger = ruhiger, mehr = lebhafter. Gilt für jedes Fenster." />
+                                            </StackPanel>
+                                            <Slider
+                                                x:Name="AnimIntensitySlider"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Maximum="1.6"
+                                                Minimum="0.5"
+                                                SmallChange="0.05"
+                                                Style="{StaticResource Slider.Slim}"
+                                                ValueChanged="OnSliderChanged" />
+                                            <TextBlock
+                                                x:Name="AnimIntensityValue"
+                                                Grid.Column="2"
+                                                Style="{StaticResource Value}"
+                                                Text="" />
+                                        </Grid>
                                         <CheckBox
                                             x:Name="AnimateCheck"
                                             Margin="0,0,0,10"
@@ -629,8 +994,15 @@
                                             Unchecked="OnControlChanged" />
                                         <CheckBox
                                             x:Name="MetaCheck"
+                                            Margin="0,0,0,10"
                                             Checked="OnControlChanged"
                                             Content="Fußzeile mit Modell, Tokens und Kosten zeigen"
+                                            Style="{StaticResource Switch}"
+                                            Unchecked="OnControlChanged" />
+                                        <CheckBox
+                                            x:Name="ShadowCheck"
+                                            Checked="OnControlChanged"
+                                            Content="Weicher Schatten unter der Leiste"
                                             Style="{StaticResource Switch}"
                                             Unchecked="OnControlChanged" />
                                     </StackPanel>

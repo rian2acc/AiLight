@@ -66,10 +66,30 @@ public static class SecretStore
     /// <summary>Ist ein eigener Ablageort gesetzt (Umgebungsvariable)?</summary>
     private static bool IsCustomTarget => DefaultTarget != BuiltInTarget;
 
-    /// <summary>Schlüssel lesen; leer, wenn keiner gespeichert ist.</summary>
-    public static string Read(string? target = null)
+    /// <summary>
+    /// Wo der Schlüssel eines Anbieters liegt. Für Groq bleibt es beim alten
+    /// Namen — wer schon eine Fassung benutzt hat, muss seinen Schlüssel nicht
+    /// neu eintippen.
+    /// </summary>
+    public static string Target(string provider)
     {
-        target ??= DefaultTarget;
+        var id = (provider ?? "").Trim().ToLowerInvariant();
+        return id.Length == 0 || id == "groq" ? DefaultTarget : $"AIlight:{id}-api-key";
+    }
+
+    /// <summary>Schlüssel eines Anbieters lesen; leer, wenn keiner gespeichert ist.</summary>
+    public static string Read(string provider) => ReadRaw(Target(provider));
+
+    /// <summary>Schlüssel eines Anbieters setzen (leer = löschen).</summary>
+    public static bool Write(string provider, string value) => WriteRaw(Target(provider), value);
+
+    public static bool Delete(string provider) => DeleteRaw(Target(provider));
+
+    public static bool HasKey(string provider) => Read(provider).Length > 0;
+
+    /// <summary>Schlüssel lesen; leer, wenn keiner gespeichert ist.</summary>
+    public static string ReadRaw(string target)
+    {
         var value = ReadExact(target);
         // Der Blick auf frühere Einträge gilt nur für den Standardablageort —
         // sonst würde ein fremder Zielname den echten Schlüssel zurückliefern.
@@ -84,7 +104,7 @@ public static class SecretStore
             if (old.Length > 0)
             {
                 Log.Info($"API-Schlüssel aus dem früheren Eintrag „{legacy}“ übernommen");
-                Write(old);
+                WriteRaw(target, old);
                 return old;
             }
         }
@@ -118,12 +138,11 @@ public static class SecretStore
     }
 
     /// <summary>Schlüssel setzen (leer = löschen).</summary>
-    public static bool Write(string value, string? target = null)
+    public static bool WriteRaw(string target, string value)
     {
-        target ??= DefaultTarget;
         if (string.IsNullOrWhiteSpace(value))
         {
-            return Delete(target);
+            return DeleteRaw(target);
         }
 
         var bytes = Encoding.Unicode.GetBytes(value.Trim());
@@ -135,7 +154,7 @@ public static class SecretStore
             {
                 Type = CRED_TYPE_GENERIC,
                 TargetName = target,
-                Comment = "Groq-API-Schlüssel für AIlight",
+                Comment = "API-Schlüssel für AIlight",
                 CredentialBlobSize = bytes.Length,
                 CredentialBlob = blob,
                 Persist = CRED_PERSIST_LOCAL_MACHINE,
@@ -157,9 +176,9 @@ public static class SecretStore
         }
     }
 
-    public static bool Delete(string? target = null)
+    public static bool DeleteRaw(string target)
     {
-        if (CredDeleteW(target ?? DefaultTarget, CRED_TYPE_GENERIC, 0))
+        if (CredDeleteW(target, CRED_TYPE_GENERIC, 0))
         {
             return true;
         }
@@ -168,5 +187,5 @@ public static class SecretStore
         return Marshal.GetLastWin32Error() == 1168;
     }
 
-    public static bool HasKey(string? target = null) => Read(target).Length > 0;
+    public static bool HasRaw(string target) => ReadRaw(target).Length > 0;
 }

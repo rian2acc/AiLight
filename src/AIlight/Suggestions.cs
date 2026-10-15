@@ -1,4 +1,4 @@
-using AIlight.Groq;
+﻿using AIlight.Chat;
 
 namespace AIlight;
 
@@ -60,7 +60,9 @@ public static class SuggestionBuilder
 
         if (query.Trim().Length > 0)
         {
-            var (model, reason) = GroqModels.Resolve(settings.Model, query, settings.WebSearch);
+            var provider = Ai.Providers.Find(settings.Provider);
+            var (model, reason) = Ai.Providers.Resolve(
+                provider, settings.ModelFor(provider.Id), query, settings.WebSearch && provider.WebSearch);
             var label = model.Id[(model.Id.LastIndexOf('/') + 1)..] + " · " + reason;
             rows.Add(Suggestion.ForQuestion(query.Trim(), label));
             return rows;

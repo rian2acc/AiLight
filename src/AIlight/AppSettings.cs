@@ -26,9 +26,42 @@ public sealed class AppSettings : INotifyPropertyChanged
     /// </summary>
     private bool _welcomeSeen;
 
+    /// <summary>
+    /// Wurde der Rundgang über die Leiste schon gezeigt? Er folgt einmal auf die
+    /// Einführung und bleibt danach über /rundgang, den Infobereich oder
+    /// <c>--tour</c> aufrufbar.
+    /// </summary>
+    private bool _tourSeen;
+
+    // ── Anbieter ─────────────────────────────────────────────────────────────
+
+    /// <summary>Welcher Anbieter gefragt wird (Kennung aus dem Katalog, z. B. „groq“).</summary>
+    private string _provider = "groq";
+
+    /// <summary>Eigene Adresse — für Azure und für eigene Server (leer = aus dem Katalog).</summary>
+    private string _baseUrl = "";
+
+    /// <summary>Je Anbieter das zuletzt gewählte Modell (damit der Wechsel nichts vergisst).</summary>
+    private Dictionary<string, string> _providerModels = new();
+
+    /// <summary>Wie viele Versuche bei 429/5xx unternommen werden.</summary>
+    private int _retries = 3;
+
+    /// <summary>Wie lange auf eine Antwort gewartet wird, in Sekunden.</summary>
+    private int _timeoutSeconds = 120;
+
+    /// <summary>Stück für Stück (Strom) oder alles auf einmal?</summary>
+    private bool _streaming = true;
+
+    /// <summary>Denk-Schritte ausdrücklich anfordern (nur wo der Anbieter das kann).</summary>
+    private bool _extendedThinking;
+
     // ── Modell ───────────────────────────────────────────────────────────────
     private string _model = "auto";
     private string _answerLength = "mittel";
+    private int _maxTokensOverride;
+    private double _temperature = 0.7;
+    private double _topP = 1;
     private string _reasoningEffort = "default";
     private bool _webSearch;
     private string _systemPrompt = "";
@@ -49,9 +82,23 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _showThinking;
     private bool _showMeta = true;
 
+    /// <summary>Wie lebendig die Bewegung ist (1 = Haus, 0,6 = ruhig, 1,4 = lebhaft).</summary>
+    private double _animationIntensity = 1;
+
+    /// <summary>Schatten unter der Leiste.</summary>
+    private bool _showShadow = true;
+
+    /// <summary>Engere Zeilen in der Vorschlagsliste.</summary>
+    private bool _compactRows;
+
+    /// <summary>Schriftgröße in Codeblöcken der Antwort.</summary>
+    private double _codeFontSize = 13;
+
     // ── Verlauf ──────────────────────────────────────────────────────────────
     private int _maxSuggestions = 6;
     private int _keepHistoryDays;
+    private int _historyEntries = 500;
+    private bool _clearInputAfterSend = true;
 
     // ── Erweitert ────────────────────────────────────────────────────────────
     private bool _logging = true;
@@ -81,10 +128,22 @@ public sealed class AppSettings : INotifyPropertyChanged
     public string Hotkey { get => _hotkey; set => Set(ref _hotkey, value); }
     public bool StartWithWindows { get => _startWithWindows; set => Set(ref _startWithWindows, value); }
     public bool WelcomeSeen { get => _welcomeSeen; set => Set(ref _welcomeSeen, value); }
+    public bool TourSeen { get => _tourSeen; set => Set(ref _tourSeen, value); }
     public bool PreloadBar { get => _preloadBar; set => Set(ref _preloadBar, value); }
     public bool HideOnLostFocus { get => _hideOnLostFocus; set => Set(ref _hideOnLostFocus, value); }
 
+    public string Provider { get => _provider; set => Set(ref _provider, value); }
+    public string BaseUrl { get => _baseUrl; set => Set(ref _baseUrl, value); }
+    public Dictionary<string, string> ProviderModels { get => _providerModels; set => Set(ref _providerModels, value); }
+    public int Retries { get => _retries; set => Set(ref _retries, value); }
+    public int TimeoutSeconds { get => _timeoutSeconds; set => Set(ref _timeoutSeconds, value); }
+    public bool Streaming { get => _streaming; set => Set(ref _streaming, value); }
+    public bool ExtendedThinking { get => _extendedThinking; set => Set(ref _extendedThinking, value); }
+
     public string Model { get => _model; set => Set(ref _model, value); }
+    public int MaxTokensOverride { get => _maxTokensOverride; set => Set(ref _maxTokensOverride, value); }
+    public double Temperature { get => _temperature; set => Set(ref _temperature, value); }
+    public double TopP { get => _topP; set => Set(ref _topP, value); }
     public string AnswerLength { get => _answerLength; set => Set(ref _answerLength, value); }
     public string ReasoningEffort { get => _reasoningEffort; set => Set(ref _reasoningEffort, value); }
     public bool WebSearch { get => _webSearch; set => Set(ref _webSearch, value); }
@@ -106,6 +165,13 @@ public sealed class AppSettings : INotifyPropertyChanged
 
     public int MaxSuggestions { get => _maxSuggestions; set => Set(ref _maxSuggestions, value); }
     public int KeepHistoryDays { get => _keepHistoryDays; set => Set(ref _keepHistoryDays, value); }
+    public int HistoryEntries { get => _historyEntries; set => Set(ref _historyEntries, value); }
+    public bool ClearInputAfterSend { get => _clearInputAfterSend; set => Set(ref _clearInputAfterSend, value); }
+
+    public double AnimationIntensity { get => _animationIntensity; set => Set(ref _animationIntensity, value); }
+    public bool ShowShadow { get => _showShadow; set => Set(ref _showShadow, value); }
+    public bool CompactRows { get => _compactRows; set => Set(ref _compactRows, value); }
+    public double CodeFontSize { get => _codeFontSize; set => Set(ref _codeFontSize, value); }
 
     public bool Logging { get => _logging; set => Set(ref _logging, value); }
     public string AnswersFolder { get => _answersFolder; set => Set(ref _answersFolder, value); }
@@ -116,14 +182,58 @@ public sealed class AppSettings : INotifyPropertyChanged
     public string EffectiveAnswersFolder =>
         string.IsNullOrWhiteSpace(AnswersFolder) ? Paths.DefaultAnswersFolder : AnswersFolder;
 
-    /// <summary>Maximale Antwortlänge in Tokens.</summary>
+    /// <summary>Maximale Antwortlänge in Tokens (eigene Zahl schlägt die Stufe).</summary>
     [JsonIgnore]
-    public int MaxCompletionTokens => AnswerLength switch
+    public int EffectiveMaxTokens => _maxTokensOverride > 0
+        ? _maxTokensOverride
+        : AnswerLength switch
+        {
+            "kurz" => 512,
+            "lang" => 8192,
+            _ => 2048,
+        };
+
+    /// <summary>Dasselbe unter dem alten Namen — die Oberfläche nennt es weiter so.</summary>
+    [JsonIgnore]
+    public int MaxCompletionTokens => EffectiveMaxTokens;
+
+    /// <summary>Das Modell eines Anbieters — „auto“, wenn dort noch nichts gewählt wurde.</summary>
+    public string ModelFor(string provider)
     {
-        "kurz" => 512,
-        "lang" => 8192,
-        _ => 2048,
-    };
+        var id = (provider ?? "").Trim().ToLowerInvariant();
+        if (_providerModels.TryGetValue(id, out var stored) && !string.IsNullOrWhiteSpace(stored))
+        {
+            return stored;
+        }
+
+        // Beim ersten Mal gilt die allgemeine Wahl, damit ein Anbieterwechsel
+        // nicht plötzlich „auto“ erzwingt.
+        return string.IsNullOrWhiteSpace(_model) ? "auto" : _model;
+    }
+
+    /// <summary>Das Modell eines Anbieters merken.</summary>
+    public void SetModelFor(string provider, string model)
+    {
+        var id = (provider ?? "").Trim().ToLowerInvariant();
+        if (id.Length == 0)
+        {
+            return;
+        }
+
+        // Ohne Sperre würde beim Lesen der Datei bei jeder Eigenschaft gespeichert.
+        _reading = true;
+        try
+        {
+            _providerModels[id] = model ?? "";
+            Model = model ?? "";
+        }
+        finally
+        {
+            _reading = false;
+        }
+
+        Save();
+    }
 
     /// <summary>Denk-Aufwand für die API (<c>null</c> = Parameter weglassen).</summary>
     [JsonIgnore]
@@ -196,6 +306,19 @@ public sealed class AppSettings : INotifyPropertyChanged
         _maxSuggestions = Math.Clamp(_maxSuggestions, 0, 12);
         _memoryRounds = Math.Clamp(_memoryRounds, 0, 20);
         _keepHistoryDays = Math.Clamp(_keepHistoryDays, 0, 3650);
+        _historyEntries = Math.Clamp(_historyEntries, 20, 5000);
+        _retries = Math.Clamp(_retries, 1, 6);
+        _timeoutSeconds = Math.Clamp(_timeoutSeconds, 10, 900);
+        _maxTokensOverride = Math.Clamp(_maxTokensOverride, 0, 128_000);
+        _temperature = Math.Clamp(_temperature, 0, 2);
+        _topP = Math.Clamp(_topP, 0.05, 1);
+        _animationIntensity = Math.Clamp(_animationIntensity, 0.5, 1.6);
+        _codeFontSize = Math.Clamp(_codeFontSize, 10, 20);
+        _providerModels ??= new Dictionary<string, string>();
+        if (!Ai.Providers.Known(_provider))
+        {
+            _provider = "groq";
+        }
         if (_theme is not ("system" or "hell" or "dunkel"))
         {
             _theme = "system";

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,8 +6,9 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using AIlight.Ai;
 using AIlight.Core;
-using AIlight.Groq;
+using AIlight.Chat;
 using AIlight.Views;
 using ComboBox = System.Windows.Controls.ComboBox;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
@@ -29,6 +30,9 @@ public partial class SettingsWindow : Window
     private bool _loading = true;
     private bool _keyTestActive;
     private bool _keyShownOnce;
+
+    /// <summary>Modelle, die der Anbieter selbst gemeldet hat („Modelle laden“).</summary>
+    private readonly List<string> _extraModels = new();
     private string _page = "konto";
 
     /// <summary>
@@ -99,6 +103,25 @@ public partial class SettingsWindow : Window
         OnSliderChanged(slider, new RoutedPropertyChangedEventArgs<double>(0, value));
     }
 
+    /// <summary>Die Kennungen aller Einträge einer Auswahlliste (Prüfstand).</summary>
+    internal IReadOnlyList<string> ItemTagsForTest(string boxName)
+        => ((ComboBox)FindName(boxName)!).Items
+            .OfType<ComboBoxItem>()
+            .Select(item => (item.Tag as string) ?? "")
+            .ToList();
+
+    /// <summary>Steht ein Eintrag mit dieser Kennung in der Liste? (Prüfstand)</summary>
+    internal bool HasItemForTest(string boxName, string tag)
+        => ItemWithTag((ComboBox)FindName(boxName)!, tag) is not null;
+
+    /// <summary>Einen Text in ein Feld schreiben und die Änderung auslösen (Prüfstand).</summary>
+    internal void ApplyTextForTest(string boxName, string value)
+    {
+        var box = (TextBox)FindName(boxName)!;
+        box.Text = value;
+        OnControlChanged(box, new RoutedEventArgs());
+    }
+
     internal IReadOnlyList<string> AreaKeysForTest => Areas.Select(area => area.Key).ToList();
 
     internal bool IsAreaVisibleForTest(string key) => _pages[key].Visibility == Visibility.Visible;
@@ -160,10 +183,8 @@ public partial class SettingsWindow : Window
 
     private void BuildChoices()
     {
-        Fill(ModelBox,
-            ("Automatisch (empfohlen)", GroqModels.Auto),
-            ("gpt-oss-20b — schnell und günstig", GroqModels.Small.Id),
-            ("gpt-oss-120b — stärker", GroqModels.Large.Id));
+        // Die Anbieter kommen aus dem Katalog — was dort steht, ist auch wählbar.
+        Fill(ProviderBox, Providers.All.Select(provider => (provider.Name, provider.Id)).ToArray());
 
         Fill(LengthBox, ("Kurz", "kurz"), ("Mittel", "mittel"), ("Lang", "lang"));
 
@@ -196,6 +217,73 @@ public partial class SettingsWindow : Window
             ("Segoe UI", "segoe"),
             ("Calibri", "calibri"),
             ("Arial", "arial"));
+
+        Fill(HistoryBox,
+            ("100 Antworten", "100"),
+            ("250 Antworten", "250"),
+            ("500 Antworten (Standard)", "500"),
+            ("1.000 Antworten", "1000"),
+            ("2.500 Antworten", "2500"),
+            ("5.000 Antworten", "5000"));
+    }
+
+    /// <summary>Der Anbieter, um den es gerade geht.</summary>
+    private ProviderInfo Provider => Providers.Find(_settings.Provider);
+
+    /// <summary>
+    /// Die Modellliste gehört zum Anbieter: sie wird bei jedem Wechsel neu gebaut.
+    /// Steht ein Name nicht im Katalog (oder ist er selbst eingetippt), bleibt er
+    /// trotzdem wählbar — kein Anbieter kommt hier vollständig vor.
+    /// </summary>
+    private void ReloadModels()
+    {
+        var provider = Provider;
+        var chosen = _settings.ProviderModels.TryGetValue(provider.Id, out var stored)
+                     && !string.IsNullOrWhiteSpace(stored)
+            ? stored.Trim()
+            : Providers.Auto;
+
+        var items = new List<(string Label, string Value)>
+        {
+            ("Automatisch (empfohlen)", Providers.Auto),
+        };
+
+        foreach (var model in provider.Catalog)
+        {
+            var price = model.Priced ? $" · {model.InputPerMillion:0.###}/{model.OutputPerMillion:0.###} $ je Mio." : "";
+            items.Add((model.Label + price, model.Id));
+        }
+
+        foreach (var name in _extraModels)
+        {
+            if (items.All(item => item.Value != name))
+            {
+                items.Add((name + " (vom Anbieter gemeldet)", name));
+            }
+        }
+
+        if (chosen != Providers.Auto && items.All(item => item.Value != chosen))
+        {
+            items.Add((chosen + " (eigener Name)", chosen));
+        }
+
+        ModelBox.Items.Clear();
+        Fill(ModelBox, items.ToArray());
+        ModelBox.SelectedItem = ItemWithTag(ModelBox, chosen) ?? ModelBox.Items[0];
+        ModelNameBox.Text = chosen == Providers.Auto ? "" : chosen;
+        ModelInfoText.Text = provider.Note;
+    }
+
+    /// <summary>Alles, was am Anbieterwechsel hängt: Adresse, Schlüssel und Modelle.</summary>
+    private void UpdateProviderInfo()
+    {
+        var provider = Provider;
+        ProviderInfoText.Text = provider.NeedsKey
+            ? $"Gefragt wird über {provider.Name}. Der Schlüssel liegt getrennt je Anbieter — ein Wechsel lässt die anderen unangetastet."
+            : $"{provider.Name} läuft auf diesem Rechner: es genügt, wenn der Server läuft. Ein Schlüssel ist nicht nötig.";
+        BaseUrlHint.Text = $"Standard: {provider.BaseUrl}";
+        KeyHint.Text = provider.KeyHint;
+        KeyBox.IsEnabled = provider.NeedsKey;
     }
 
     private void BuildAccents()
@@ -230,14 +318,28 @@ public partial class SettingsWindow : Window
     {
         NavVersion.Text = "Version " + typeof(App).Assembly.GetName().Version;
 
-        ModelBox.SelectedItem = ItemWithTag(ModelBox, _settings.Model) ?? ModelBox.Items[0];
+        ProviderBox.SelectedItem = ItemWithTag(ProviderBox, _settings.Provider) ?? ProviderBox.Items[0];
+        BaseUrlBox.Text = _settings.BaseUrl;
+        UpdateProviderInfo();
+        ReloadModels();
+
         LengthBox.SelectedItem = ItemWithTag(LengthBox, _settings.AnswerLength) ?? LengthBox.Items[1];
         ReasoningBox.SelectedItem = ItemWithTag(ReasoningBox, _settings.ReasoningEffort) ?? ReasoningBox.Items[0];
         MemoryBox.SelectedItem = ItemWithTag(MemoryBox, _settings.MemoryRounds.ToString()) ?? MemoryBox.Items[3];
         KeepBox.SelectedItem = ItemWithTag(KeepBox, _settings.KeepHistoryDays.ToString()) ?? KeepBox.Items[0];
         ThemeBox.SelectedItem = ItemWithTag(ThemeBox, _settings.Theme) ?? ThemeBox.Items[0];
+        HistoryBox.SelectedItem = ItemWithTag(HistoryBox, _settings.HistoryEntries.ToString())
+            ?? ItemWithTag(HistoryBox, "500") ?? HistoryBox.Items[0];
 
         WebSearchCheck.IsChecked = _settings.WebSearch;
+        StreamingCheck.IsChecked = _settings.Streaming;
+        ThinkingExtCheck.IsChecked = _settings.ExtendedThinking;
+        ClearInputCheck.IsChecked = _settings.ClearInputAfterSend;
+        CompactCheck.IsChecked = _settings.CompactRows;
+        ShadowCheck.IsChecked = _settings.ShowShadow;
+        MaxTokensBox.Text = _settings.MaxTokensOverride > 0
+            ? _settings.MaxTokensOverride.ToString()
+            : "";
         PromptBox.Text = _settings.SystemPrompt;
 
         WidthSlider.Value = _settings.WindowWidth;
@@ -246,6 +348,14 @@ public partial class SettingsWindow : Window
         OpacitySlider.Value = _settings.Opacity;
         CornerSlider.Value = _settings.CornerRadius;
         FontBox.SelectedItem = ItemWithTag(FontBox, _settings.FontFamily) ?? FontBox.Items[0];
+        CodeFontSlider.Value = _settings.CodeFontSize;
+
+        TempSlider.Value = _settings.Temperature;
+        TopPSlider.Value = _settings.TopP;
+        TimeoutSlider.Value = _settings.TimeoutSeconds;
+        RetrySlider.Value = _settings.Retries;
+        SuggestionSlider.Value = _settings.MaxSuggestions;
+        AnimIntensitySlider.Value = _settings.AnimationIntensity;
 
         AnimateCheck.IsChecked = _settings.AnimateBar;
         ThinkingCheck.IsChecked = _settings.ShowThinking;
@@ -286,6 +396,13 @@ public partial class SettingsWindow : Window
         FontValue.Text = $"{FontSlider.Value:0}";
         OpacityValue.Text = $"{OpacitySlider.Value:P0}";
         CornerValue.Text = $"{CornerSlider.Value:0}";
+        CodeFontValue.Text = $"{CodeFontSlider.Value:0}";
+        TempValue.Text = $"{TempSlider.Value:0.0}";
+        TopPValue.Text = $"{TopPSlider.Value:0.00}";
+        TimeoutValue.Text = $"{TimeoutSlider.Value:0} s";
+        RetryValue.Text = $"{RetrySlider.Value:0}";
+        SuggestionValue.Text = $"{SuggestionSlider.Value:0}";
+        AnimIntensityValue.Text = $"{AnimIntensitySlider.Value:0.00}×";
 
         // Die Vorschau folgt auch dem Ecken-Radius — so sieht man sofort,
         // wie rund die Leiste wirklich wird.
@@ -437,17 +554,25 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        _settings.Model = TagOf(ModelBox, GroqModels.Auto);
         _settings.AnswerLength = TagOf(LengthBox, "mittel");
         _settings.ReasoningEffort = TagOf(ReasoningBox, "default");
         _settings.MemoryRounds = int.TryParse(TagOf(MemoryBox, "3"), out var rounds) ? rounds : 3;
         _settings.KeepHistoryDays = int.TryParse(TagOf(KeepBox, "0"), out var days) ? days : 0;
+        _settings.HistoryEntries = int.TryParse(TagOf(HistoryBox, "500"), out var entries) ? entries : 500;
         _settings.Theme = TagOf(ThemeBox, "system");
         _settings.FontFamily = TagOf(FontBox, "system");
         _settings.AnimateBar = AnimateCheck.IsChecked == true;
         _settings.ShowThinking = ThinkingCheck.IsChecked == true;
         _settings.ShowMeta = MetaCheck.IsChecked == true;
+        _settings.ShowShadow = ShadowCheck.IsChecked == true;
+        _settings.CompactRows = CompactCheck.IsChecked == true;
         _settings.WebSearch = WebSearchCheck.IsChecked == true;
+        _settings.Streaming = StreamingCheck.IsChecked == true;
+        _settings.ExtendedThinking = ThinkingExtCheck.IsChecked == true;
+        _settings.ClearInputAfterSend = ClearInputCheck.IsChecked == true;
+        _settings.MaxTokensOverride = int.TryParse(MaxTokensBox.Text.Trim(), out var max) ? max : 0;
+        _settings.BaseUrl = BaseUrlBox.Text.Trim();
+        _settings.Provider = Provider.Id;
         _settings.SystemPrompt = PromptBox.Text.Trim();
         _settings.StartWithWindows = StartCheck.IsChecked == true;
         _settings.PreloadBar = PreloadCheck.IsChecked == true;
@@ -472,6 +597,13 @@ public partial class SettingsWindow : Window
         _settings.FontSize = Math.Round(FontSlider.Value);
         _settings.Opacity = Math.Round(OpacitySlider.Value, 2);
         _settings.CornerRadius = Math.Round(CornerSlider.Value);
+        _settings.CodeFontSize = Math.Round(CodeFontSlider.Value);
+        _settings.Temperature = Math.Round(TempSlider.Value, 2);
+        _settings.TopP = Math.Round(TopPSlider.Value, 2);
+        _settings.TimeoutSeconds = (int)Math.Round(TimeoutSlider.Value);
+        _settings.Retries = (int)Math.Round(RetrySlider.Value);
+        _settings.MaxSuggestions = (int)Math.Round(SuggestionSlider.Value);
+        _settings.AnimationIntensity = Math.Round(AnimIntensitySlider.Value, 2);
         UpdateSliderLabels();
     }
 
@@ -496,6 +628,103 @@ public partial class SettingsWindow : Window
         HotkeyStatus.Text = "Gespeichert und sofort aktiv. Konflikte meldet AIlight mit einem Hinweis unten rechts.";
     }
 
+    // ── Anbieter und Modell ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Anbieterwechsel: Adresse, Schlüssel und Modellliste hängen daran. Jeder
+    /// Anbieter hat seinen eigenen Schlüssel und seine eigene letzte Modellwahl.
+    /// </summary>
+    private void OnProviderChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        var id = TagOf(ProviderBox, "groq");
+        if (_settings.Provider != id)
+        {
+            _settings.Provider = id;
+
+            // Die eigene Adresse gehört zu dem Anbieter, für den sie eingetragen
+            // wurde — für den neuen gilt wieder seine Standardadresse.
+            _settings.BaseUrl = "";
+            BaseUrlBox.Text = "";
+            _extraModels.Clear();
+            ModelStatus.Text = "";
+            _keyShownOnce = false;
+        }
+
+        UpdateProviderInfo();
+        ReloadModels();
+        UpdateKeyStatus();
+    }
+
+    /// <summary>Ein Modell aus der Liste — die Wahl wird je Anbieter gemerkt.</summary>
+    private void OnModelChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        var chosen = TagOf(ModelBox, Providers.Auto);
+        _settings.SetModelFor(Provider.Id, chosen);
+        ModelNameBox.Text = chosen == Providers.Auto ? "" : chosen;
+    }
+
+    /// <summary>Ein selbst eingetippter Modellname schlägt die Liste.</summary>
+    private void OnModelNameChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        var name = ModelNameBox.Text.Trim();
+        _settings.SetModelFor(Provider.Id, name.Length == 0 ? Providers.Auto : name);
+        ReloadModels();
+    }
+
+    /// <summary>
+    /// Die Modelle abfragen, die der Anbieter (oder ein lokaler Server) wirklich
+    /// anbietet — damit niemand Namen raten muss.
+    /// </summary>
+    private async void OnLoadModels(object sender, RoutedEventArgs e)
+    {
+        var provider = Provider;
+        LoadModelsButton.IsEnabled = false;
+        ModelStatus.Text = $"Frage die Modellliste von {provider.Name} ab …";
+
+        try
+        {
+            using var clock = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var names = await _chat.AvailableModelsAsync(clock.Token);
+            _extraModels.Clear();
+            _extraModels.AddRange(names);
+            ReloadModels();
+            ModelStatus.Text = names.Count == 0
+                ? "Der Anbieter hat keine Liste zurückgegeben — der Name lässt sich von Hand eintippen."
+                : $"{names.Count} Modell(e) geladen: {Joined(names)}";
+        }
+        catch (Exception ex)
+        {
+            ModelStatus.Text = "Die Liste kam nicht an: " + ex.Message;
+        }
+        finally
+        {
+            LoadModelsButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Die ersten Namen einer Liste, damit die Meldung kurz bleibt.</summary>
+    private static string Joined(IReadOnlyList<string> names)
+    {
+        var head = names.Take(4).ToList();
+        var text = string.Join(", ", head);
+        return names.Count > head.Count ? text + " …" : text;
+    }
+
     // ── Konto ───────────────────────────────────────────────────────────────
 
     private void UpdateKeyStatus()
@@ -508,9 +737,15 @@ public partial class SettingsWindow : Window
             _keyShownOnce = true;
         }
 
+        if (!Provider.NeedsKey)
+        {
+            KeyStatus.Text = $"{Provider.Name} braucht keinen Schlüssel — das Feld darf leer bleiben.";
+            return;
+        }
+
         KeyStatus.Text = _chat.HasKey
-            ? "Ein Schlüssel ist gespeichert."
-            : "Es ist noch kein Schlüssel gespeichert — ohne Schlüssel kann AIlight nichts fragen.";
+            ? $"Für {Provider.Name} ist ein Schlüssel gespeichert."
+            : $"Für {Provider.Name} ist noch kein Schlüssel gespeichert — ohne ihn kann AIlight hier nichts fragen.";
     }
 
     private void OnSaveKey(object sender, RoutedEventArgs e)
@@ -518,21 +753,21 @@ public partial class SettingsWindow : Window
         var value = KeyBox.Password.Trim();
         if (value.Length == 0)
         {
-            KeyStatus.Text = "Bitte einen Schlüssel eingeben (beginnt üblicherweise mit „gsk_“).";
+            KeyStatus.Text = "Bitte einen Schlüssel eingeben. " + Provider.KeyHint;
             return;
         }
 
-        KeyStatus.Text = SecretStore.Write(value)
-            ? "Schlüssel gespeichert. Mit „Schlüssel testen“ prüfen wir ihn sofort."
+        KeyStatus.Text = SecretStore.Write(Provider.Id, value)
+            ? $"Schlüssel für {Provider.Name} gespeichert. Mit „Schlüssel testen“ prüfen wir ihn sofort."
             : "Der Schlüssel konnte nicht gespeichert werden — Details stehen im Protokoll.";
     }
 
     private void OnDeleteKey(object sender, RoutedEventArgs e)
     {
-        SecretStore.Delete();
+        SecretStore.Delete(Provider.Id);
         KeyBox.Password = "";
         UpdateKeyStatus();
-        KeyStatus.Text = "Schlüssel gelöscht.";
+        KeyStatus.Text = $"Der Schlüssel für {Provider.Name} ist gelöscht — die anderen bleiben.";
     }
 
     private async void OnTestKey(object sender, RoutedEventArgs e)
@@ -557,10 +792,10 @@ public partial class SettingsWindow : Window
 
         try
         {
-            var message = await _chat.Client.TestKeyAsync(key, _keyTest.Token);
-            var (model, _) = GroqModels.Resolve(_settings.Model, "Test", _settings.WebSearch);
-            KeyStatus.Text = message + $" (Test mit {model.Id})";
-            SecretStore.Write(key);
+            var message = await _chat.TestKeyAsync(key, _keyTest.Token);
+            KeyStatus.Text = message;
+            SecretStore.Write(Provider.Id, key);
+            UpdateKeyStatus();
         }
         catch (Exception ex)
         {
@@ -580,7 +815,7 @@ public partial class SettingsWindow : Window
     {
         var (count, tokensIn, tokensOut, cost, bytes) = _chat.History.Stats();
         StatsText.Text = $"Gespeichert: {count} Antwort(en) · {tokensIn} → {tokensOut} Tokens · "
-            + $"{GroqModels.FormatCost(cost)} · Datei {bytes / 1024.0:0.0} kB";
+            + $"{Providers.FormatCost(cost)} · Datei {bytes / 1024.0:0.0} kB";
     }
 
     private void OnClearConversation(object sender, RoutedEventArgs e)
@@ -612,8 +847,7 @@ public partial class SettingsWindow : Window
 
     private void OnOpenDataFolder(object sender, RoutedEventArgs e) => Open(Paths.DataFolder);
 
-    private void OnOpenKeys(object sender, RoutedEventArgs e)
-        => Open("https://console.groq.com/keys");
+    private void OnOpenKeys(object sender, RoutedEventArgs e) => Open(Provider.KeyUrl);
 
     private void OnOpenRepo(object sender, RoutedEventArgs e)
         => Open("https://github.com/rian2acc/AiLight");

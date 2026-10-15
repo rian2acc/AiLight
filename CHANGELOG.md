@@ -1,8 +1,118 @@
-# Changelog
+﻿# Changelog
 
 Alle nennenswerten Änderungen an AIlight. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/).
+
+## [3.0.0] — 2026-10-15
+
+### Neu
+
+- **Nicht mehr nur Groq: dreizehn Anbieter, und jeder funktioniert.** In den
+  Einstellungen stehen Groq, OpenAI, Anthropic (Claude), Google Gemini, Mistral,
+  DeepSeek, xAI (Grok), OpenRouter, Together, Perplexity, Azure OpenAI sowie die
+  lokalen Server Ollama und LM Studio. Dafür gibt es eine gemeinsame Schicht
+  (`src/AIlight/Ai/`): **ein** Aufbau der Anfrage, **drei** Sprechweisen —
+  OpenAI-kompatibel (die Mehrheit), Anthropic (`/v1/messages`, System als Feld,
+  `max_tokens` Pflicht) und Google Gemini (`:streamGenerateContent`, `contents`,
+  `systemInstruction`). Jeder Klient versteht den Ereignisstrom seines Anbieters,
+  liest Nutzung und Abbruchgrund mit und übersetzt Fehler in deutsche Sätze
+  (401 heißt dort „Der Schlüssel wird abgelehnt (…) — bitte prüfen“).
+- **Wiederholungen mit Wartezeit.** Bei 429/5xx und Netzfehlern wird gewartet und
+  erneut versucht — `Retry-After` des Anbieters wird beachtet. Bricht die
+  Verbindung mitten in einer Antwort ab, bleibt der bisherige Text stehen.
+- **Lokale Server ohne Schlüssel.** Ollama und LM Studio brauchen keinen
+  Schlüssel; „Modelle laden“ holt die Liste direkt vom Server (`/models`), damit
+  niemand Namen raten muss. Der Anbietername wird dabei weggeklickt, was der
+  Server nicht liefert, lässt sich eintippen.
+- **Ein Schlüssel je Anbieter.** Alle liegen getrennt im
+  Windows-Anmeldeinformationsspeicher (`AIlight:<anbieter>-api-key`). Ein Wechsel
+  lässt die anderen unangetastet; der alte Groq-Eintrag bleibt gültig, niemand
+  muss seinen Schlüssel neu eintragen.
+- **Modelle je Anbieter gemerkt.** Jeder Anbieter behält seine letzte Wahl.
+  Unbekannte Modellnamen sind ausdrücklich erlaubt — Anbieter benennen ihre
+  Modelle häufiger um, als eine Fassung alt wird.
+- **Deutlich mehr Einstellungen.** Konto: Anbieter, eigene Adresse, Wartezeit,
+  Versuche. Modell: Modellliste, eigener Modellname, Antwortlänge, Höchstlänge in
+  Tokens, Denk-Aufwand, erweitertes Denken, Temperatur, Top-P, Websuche, Strom
+  Stück für Stück. Gespräch: Runden im Gedächtnis, Verlaufseinträge, Eingabefeld
+  nach dem Senden leeren. Verhalten: Anzahl der Vorschläge, kompakte Zeilen.
+  Aussehen: Stärke der Bewegung, Schatten, Schriftgröße im Code.
+- **Die Stärke der Bewegung ist einstellbar.** Ein Wert unter 1 macht alles
+  ruhiger, über 1 lebhafter; jede Bewegung rechnet ihre Zeit über
+  `Motion.Scaled` um — deshalb wirkt die Einstellung überall gleich, im Fenster,
+  in den Listen und beim Scrollen.
+
+### Geändert
+
+- Der Text der Einführung und der Hinweis beim ersten Start sprechen nicht mehr
+  nur von Groq, sondern vom gewählten Anbieter.
+- Zeilen der Vorschlagsliste dürfen eine eigene Höhe bekommen; Hover und Verlassen
+  laufen auch dort auf der Hauskurve (130 ms hin, 220 ms zurück).
+- Der Ordner `src/AIlight/Groq/` heißt `src/AIlight/Chat/` — er enthielt längst den
+  Chatdienst für alle Anbieter, nicht einen Anbieter. Die Schlüsselablage für Groq
+  behält ihren alten Namen, damit niemand seinen Schlüssel neu eintragen muss.
+
+### Behoben
+
+- **Denk-Marken über Stückgrenzen.** Kam `</think>` in einem späteren Datenstück
+  an als `<think>`, stand die Marke anschließend in der Antwort. Der Trenner
+  behält jetzt seinen Zustand und wartet auf halbe Marken („`<thi`“) — genau der
+  Fall, den Streaming regelmäßig erzeugt.
+- **Der leere Schlüssel löschte den falschen Eintrag.** Beim Löschen wurde der
+  Providername als Ablageort missverstanden; jetzt wird der Eintrag des Anbieters
+  entfernt — und nur der.
+- **„Wiederholbar“ stimmte nicht.** Bei einem abgelehnten Schlüssel (401) galt der
+  Fehler als wiederholbar — die Leiste hätte zum erneuten Fragen aufgefordert, wo
+  nur ein richtiger Schlüssel hilft. Jetzt entscheidet der Status darüber.
+- **Ein Abbruch wurde nicht als Abbruch gemeldet.** Wurde zwischen zwei Datenstücken
+  abgebrochen, endete der Lauf ohne Fehler, das Ergebnis meldete aber `cancelled:
+  false`. Jetzt bleibt der bisherige Text stehen und das Ergebnis sagt die Wahrheit.
+- **Zwanzig neue Prüfungen im Selbsttest (nun 83).** Zwei Arten: Aufbauten ohne Netz
+  — Anfrage für **jeden** Anbieter, System-Vorgabe als Feld statt Nachricht,
+  `max_tokens` gegen `max_completion_tokens`, Denk-Schritte nur dort, wo es sie
+  gibt, getrennte Schlüsselablagen, Modellliste, die dem Anbieter folgt — und der
+  **ganze Weg** gegen einen winzigen Server auf der Schleife (`LoopbackServer`):
+  ein OpenAI-kompatibler Strom, Anthropics benannte Ereignisse samt Denk-Schritt,
+  Geminis Kandidaten-Teile, ein abgelehnter Schlüssel mit lesbarer Erklärung, die
+  Modellliste und ein Abbruch mitten im Strom. Kein Netz, kein Schlüssel, keine
+  Kosten — und trotzdem Verbindung, Kopfzeilen und Auswertung geprüft.
+- **Dreizehn Anbieter sind jetzt belegt.** Zusätzlich zum Selbsttest antwortete
+  Groq auf diesem Rechner auf eine echte Frage (231 → 29 Tokens, 1,0 s,
+  erstes Zeichen nach 996 ms).
+
+## [2.5.0] — 2026-10-15
+
+### Neu
+
+- **Der Rundgang: die Leiste erklärt sich an sich selbst.** Direkt nach der
+  Einführung dunkelt der Bildschirm ab, und ein Loch wandert über die echten
+  Teile der Leiste — Zeichen, Eingabe, Vorschläge, Fußzeile. Neben dem Loch steht
+  eine Karte mit einem Satz; ist unten kein Platz, weicht sie nach oben aus.
+  Weiter mit Klick, `Enter` oder `→`, zurück mit `←`, beenden mit `Esc`.
+  Jederzeit wieder: `/rundgang` in der Leiste, „Rundgang …“ im Menü des
+  Infobereich-Symbols oder `AIlight.exe --tour`.
+- **Nur eine Sache bewegt sich.** Vorbild war das iOS-Rahmenwerk
+  [LRSpotlight](https://github.com/lekshmiraveendranath/Spotlight) (MIT): eine
+  Abdunklung mit einer Aussparung, gezeichnet als Loch (`FillRule=EvenOdd`).
+  Beim Wechsel wird genau **eine** Eigenschaft bewegt — das Rechteck der
+  Aussparung —, auf derselben Kurve und mit derselben Dauer wie ein
+  Seitenwechsel (`Motion.InOut`, 260 ms). Die Karte springt einmal an ihre neue
+  Stelle, statt während der Bewegung mitzulaufen; nichts wird neu angeordnet,
+  nichts skaliert, nichts blendet gleichzeitig. Das Loch bleibt auf ganzen
+  Pixeln, damit die Kante beim Gleiten nicht flimmert.
+- **Ehrliche Halte.** Was gerade nicht im Bild steht, fällt weg: läuft schon eine
+  Frage, zeigt der Rundgang nicht auf Vorschläge, die es gerade nicht gibt.
+- **Zweiter Bildschirm mitgedacht.** Ziele werden aus Bildschirmkoordinaten in
+  die Koordinaten der Ebene umgerechnet (`Spotlight.InLayer`) — auch wenn die
+  Ebene links vom Hauptbildschirm beginnt, sitzt das Loch am Ziel.
+- **Vier neue Prüfungen** (nun 63): Loch-Geometrie samt Mindestgröße und ganzen
+  Pixeln, das Ausweichen der Karte im Bild, das Gleiten samt Ankunft und die
+  Abdunklung nur außen (Pixel), und die Halte der Leiste samt Weglassen.
+
+### Geändert
+
+- Die Einführung kündigt den Rundgang an und nennt `/rundgang` als Weg zurück.
 
 ## [2.4.0] — 2026-10-15
 

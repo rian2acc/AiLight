@@ -12,7 +12,11 @@ namespace AIlight.Views;
 /// </summary>
 public static class Markdown
 {
-    public static IReadOnlyList<UIElement> Render(string text, double fontSize)
+    /// <summary>
+    /// Markdown in Bausteine übersetzen. <paramref name="codeFontSize"/> gilt für
+    /// Codeblöcke; ohne eigene Angabe bleibt es bei der Ableitung aus der Schrift.
+    /// </summary>
+    public static IReadOnlyList<UIElement> Render(string text, double fontSize, double codeFontSize = 0)
     {
         var blocks = new List<UIElement>();
         var lines = (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -34,7 +38,7 @@ public static class Markdown
                 }
 
                 index++; // schließende Zeile
-                blocks.Add(CodeBlock(string.Join("\n", code), fontSize));
+                blocks.Add(CodeBlock(string.Join("\n", code), fontSize, codeFontSize));
                 continue;
             }
 
@@ -134,7 +138,7 @@ public static class Markdown
                     index++;
                 }
 
-                blocks.Add(CodeBlock(string.Join("\n", rows), fontSize));
+                blocks.Add(CodeBlock(string.Join("\n", rows), fontSize, codeFontSize));
                 continue;
             }
 
@@ -187,13 +191,13 @@ public static class Markdown
     }
 
     /// <summary>Codeblock mit eigenem „Kopieren“-Knopf — praktischer als markieren.</summary>
-    private static Border CodeBlock(string code, double fontSize)
+    private static Border CodeBlock(string code, double fontSize, double codeFontSize = 0)
     {
         var body = code.Trim('\n');
         var text = new TextBlock
         {
             FontFamily = Resource("Font.Mono", new FontFamily("Consolas")),
-            FontSize = Math.Max(11, fontSize - 1.5),
+            FontSize = codeFontSize > 0 ? codeFontSize : Math.Max(11, fontSize - 1.5),
             Foreground = Resource<Brush>("Brush.Text", new SolidColorBrush(Colors.WhiteSmoke)),
             TextWrapping = TextWrapping.Wrap,
             Text = body,

@@ -1,6 +1,9 @@
-using System.IO;
+﻿using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -8,7 +11,8 @@ using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AIlight.Core;
-using AIlight.Groq;
+using AIlight.Ai;
+using AIlight.Chat;
 using AIlight.Views;
 
 namespace AIlight;
@@ -49,6 +53,8 @@ public static class SelfTest
         TestHistory();
         TestSecrets();
         TestPayload();
+        TestProviders();
+        TestStreams();
         TestSuggestions();
         TestMotion();
         TestUserInterface();
@@ -195,12 +201,12 @@ public static class SelfTest
             {
                 var settings = AppSettings.Load(file);   // schreibt nur in die Temporärdatei
                 settings.Hotkey = "Ctrl+Shift+K";
-                settings.Model = GroqModels.Large.Id;
+                settings.Model = Providers.Groq.Strong.Id;
                 settings.FontSize = 20;
                 settings.Save();
                 var loaded = AppSettings.Load(file);
                 Equal("Ctrl+Shift+K", loaded.Hotkey, "Hotkey");
-                Equal(GroqModels.Large.Id, loaded.Model, "Modell");
+                Equal(Providers.Groq.Strong.Id, loaded.Model, "Modell");
                 Equal(20d, loaded.FontSize, "Schriftgröße");
             }
             finally
@@ -271,29 +277,29 @@ public static class SelfTest
     {
         Check("Modell: „auto“ wählt bei kurzer Frage das kleine Modell", () =>
         {
-            var (model, _) = GroqModels.Resolve("auto", "Was ist 2+2?", webSearch: false);
-            Equal(GroqModels.Small.Id, model.Id, "Modell");
+            var (model, _) = Providers.Resolve(Providers.Groq, "auto", "Was ist 2+2?", webSearch: false);
+            Equal(Providers.Groq.Fast.Id, model.Id, "Modell");
         });
 
         Check("Modell: „auto“ wählt bei Websuche das große Modell", () =>
         {
-            var (model, _) = GroqModels.Resolve("auto", "kurz", webSearch: true);
-            Equal(GroqModels.Large.Id, model.Id, "Modell");
+            var (model, _) = Providers.Resolve(Providers.Groq, "auto", "kurz", webSearch: true);
+            Equal(Providers.Groq.Strong.Id, model.Id, "Modell");
         });
 
         Check("Modell: feste Wahl wird nicht überstimmt", () =>
         {
-            var (model, reason) = GroqModels.Resolve(GroqModels.Small.Id, new string('x', 900), webSearch: true);
-            Equal(GroqModels.Small.Id, model.Id, "Modell");
+            var (model, reason) = Providers.Resolve(Providers.Groq, Providers.Groq.Fast.Id, new string('x', 900), webSearch: true);
+            Equal(Providers.Groq.Fast.Id, model.Id, "Modell");
             True(reason.Length > 0, "Begründung fehlt");
         });
 
         Check("Modell: Kosten werden gerechnet und lesbar formatiert", () =>
         {
-            var cost = GroqModels.Small.Cost(1_000_000, 1_000_000);
+            var cost = Providers.Groq.Fast.Cost(1_000_000, 1_000_000);
             Equal(0.375d, Math.Round(cost, 6), "Preis 20b");
-            True(GroqModels.FormatCost(0.00023).Contains("0,0002"), "Formatierung");
-            Equal("~$0", GroqModels.FormatCost(0), "Nullkosten");
+            True(Providers.FormatCost(0.00023).Contains("0,0002"), "Formatierung");
+            Equal("~$0", Providers.FormatCost(0), "Nullkosten");
         });
     }
 
@@ -465,12 +471,199 @@ public static class SelfTest
             // Wichtig: hier werden nur Vergleiche gemeldet, nie Werte — sonst
             // könnte ein echter Schlüssel im Protokoll des Prüfstands landen.
             const string target = "AIlight:selftest";
-            True(SecretStore.Write("testwert", target), "Schreiben fehlgeschlagen");
-            True(SecretStore.Read(target) == "testwert", "Gelesener Wert stimmt nicht");
-            True(SecretStore.HasKey(target), "HasKey meldet nichts");
-            True(SecretStore.Delete(target), "Löschen fehlgeschlagen");
-            True(SecretStore.Read(target).Length == 0, "nach dem Löschen ist noch ein Eintrag vorhanden");
-            True(!SecretStore.HasKey(target), "HasKey findet einen gelöschten Eintrag");
+            True(SecretStore.WriteRaw(target, "testwert"), "Schreiben fehlgeschlagen");
+            True(SecretStore.ReadRaw(target) == "testwert", "Gelesener Wert stimmt nicht");
+            True(SecretStore.HasRaw(target), "HasRaw meldet nichts");
+            True(SecretStore.DeleteRaw(target), "Löschen fehlgeschlagen");
+            True(SecretStore.ReadRaw(target).Length == 0, "nach dem Löschen ist noch ein Eintrag vorhanden");
+            True(!SecretStore.HasRaw(target), "HasRaw findet einen gelöschten Eintrag");
+        });
+
+        Check("Schlüssel: jeder Anbieter hat seinen eigenen Eintrag", () =>
+        {
+            const string provider = "selftest-anbieter";
+            True(SecretStore.Write(provider, "testwert-zwei"), "Schreiben je Anbieter fehlgeschlagen");
+            True(SecretStore.Read(provider) == "testwert-zwei", "Lesen je Anbieter fehlgeschlagen");
+            True(SecretStore.HasKey(provider), "HasKey meldet je Anbieter nichts");
+            True(SecretStore.Target(provider) != SecretStore.Target("groq"),
+                "zwei Anbieter teilen sich denselben Eintrag");
+            True(SecretStore.Delete(provider), "Löschen je Anbieter fehlgeschlagen");
+            True(SecretStore.Read(provider).Length == 0, "nach dem Löschen ist noch ein Eintrag vorhanden");
+        });
+    }
+
+    // ── Anbieter ────────────────────────────────────────────────────
+
+    /// <summary>Den Anfragetext so bauen, wie der Klient ihn sendet — ohne Netz.</summary>
+    private static string Payload(AskRequest request, ProviderInfo? provider = null)
+    {
+        var chosen = provider ?? Providers.Groq;
+        var call = new AiCall(chosen, chosen.BaseUrl, "test-schluessel", request);
+        return AiClients.For(chosen).Payload(call);
+    }
+
+    /// <summary>Eine typische Frage an einen Anbieter, für die Aufbauten unten.</summary>
+    private static AskRequest Simple(
+        ProviderInfo provider, bool webSearch = false, bool thinking = false, bool stream = true)
+        => new()
+        {
+            Model = provider.Fast.Id,
+            Messages = new[]
+            {
+                new ChatMessage("system", "Werde knapp."),
+                new ChatMessage("user", "Kurz: was ist Strom?"),
+            },
+            MaxCompletionTokens = 1234,
+            Temperature = 0.4,
+            TopP = 0.9,
+            WebSearch = webSearch,
+            Thinking = thinking,
+            Stream = stream,
+        };
+
+    private static void TestProviders()
+    {
+        Check("Anbieter: jeder Eintrag ist vollständig und eindeutig", () =>
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var provider in Providers.All)
+            {
+                True(ids.Add(provider.Id), $"doppelte Kennung {provider.Id}");
+                True(provider.Name.Length > 0, $"Name fehlt bei {provider.Id}");
+                True(provider.BaseUrl.StartsWith("http", StringComparison.Ordinal), $"Adresse fehlt bei {provider.Id}");
+                True(provider.KeyUrl.StartsWith("http", StringComparison.Ordinal), $"Schlüsselseite fehlt bei {provider.Id}");
+                True(provider.KeyHint.Length > 0, $"Schlüsselhinweis fehlt bei {provider.Id}");
+                True(provider.Fast.Id.Length > 0 && provider.Strong.Id.Length > 0, $"Modelle fehlen bei {provider.Id}");
+                True(provider.Catalog.Count >= 2, $"Katalog zu klein bei {provider.Id}");
+                True(provider.MaxTokensField.Length > 0, $"Token-Feld fehlt bei {provider.Id}");
+            }
+
+            True(Providers.All.Count >= 10, "zu wenige Anbieter");
+            Equal("groq", Providers.Find("gibtsnicht").Id, "unbekannter Anbieter fällt nicht zurück");
+            True(!Providers.Known("gibtsnicht"), "unbekannter Anbieter gilt als bekannt");
+            True(Providers.Known("anthropic") && Providers.Known("gemini") && Providers.Known("openai"),
+                "bekannte Anbieter fehlen");
+        });
+
+        Check("Anbieter: lokale Server brauchen keinen Schlüssel", () =>
+        {
+            True(!Providers.Ollama.NeedsKey, "Ollama verlangt einen Schlüssel");
+            True(!Providers.LmStudio.NeedsKey, "LM Studio verlangt einen Schlüssel");
+            True(Providers.Ollama.BaseUrl.StartsWith("http://localhost", StringComparison.Ordinal), "Ollama-Adresse");
+            True(Providers.OpenAi.NeedsKey, "OpenAI soll einen Schlüssel verlangen");
+            True(Providers.Azure.BaseUrlRequired, "Azure braucht eine eigene Adresse");
+        });
+
+        Check("Anbieter: Schlüssel liegen getrennt je Anbieter", () =>
+        {
+            Equal("AIlight:groq-api-key", SecretStore.Target("groq"), "Groq-Ablage");
+            Equal("AIlight:openai-api-key", SecretStore.Target("openai"), "OpenAI-Ablage");
+            Equal("AIlight:anthropic-api-key", SecretStore.Target("anthropic"), "Anthropic-Ablage");
+            Equal("AIlight:gemini-api-key", SecretStore.Target("gemini"), "Gemini-Ablage");
+        });
+
+        Check("Anbieter: die Form des Anbieters wählt den Klienten", () =>
+        {
+            True(AiClients.For(Providers.Anthropic) is AnthropicClient, "Anthropic bekommt den falschen Klienten");
+            True(AiClients.For(Providers.Gemini) is GeminiClient, "Gemini bekommt den falschen Klienten");
+            True(AiClients.For(Providers.OpenAi) is OpenAiClient, "OpenAI bekommt den falschen Klienten");
+            True(AiClients.For(Providers.Ollama) is OpenAiClient, "Ollama bekommt den falschen Klienten");
+        });
+
+        Check("Anfrage: jeder Anbieter baut einen lesbaren Aufruftext", () =>
+        {
+            foreach (var provider in Providers.All)
+            {
+                var json = Payload(Simple(provider), provider);
+                using var document = JsonDocument.Parse(json);
+                True(document.RootElement.ValueKind == JsonValueKind.Object, $"kein Objekt bei {provider.Id}");
+
+                // Gemini trägt den Modellnamen nicht im Text, sondern in der Adresse
+                // (/models/{modell}:streamGenerateContent) — dort ist er richtig.
+                if (provider.Shape != ApiShape.Gemini)
+                {
+                    True(json.Contains(provider.Fast.Id, StringComparison.Ordinal), $"Modell fehlt im Text bei {provider.Id}");
+                }
+                True(json.Contains(provider.MaxTokensField, StringComparison.Ordinal),
+                    $"Token-Feld {provider.MaxTokensField} fehlt bei {provider.Id}");
+            }
+        });
+
+        Check("Anfrage: Anthropic bekommt das System als Feld, nicht als Nachricht", () =>
+        {
+            var provider = Providers.Anthropic;
+            using var document = JsonDocument.Parse(Payload(Simple(provider), provider));
+            var root = document.RootElement;
+
+            Equal("Werde knapp.", root.GetProperty("system").GetString(), "System-Vorgabe");
+            Equal(1234, root.GetProperty("max_tokens").GetInt32(), "Token-Limit");
+            Equal(1, root.GetProperty("messages").GetArrayLength(), "System zählt als Nachricht mit");
+            Equal("user", root.GetProperty("messages")[0].GetProperty("role").GetString(), "Rolle");
+            Equal(0.9, Math.Round(root.GetProperty("top_p").GetDouble(), 4), "Top-P");
+        });
+
+        Check("Anfrage: Gemini bekommt contents, parts und systemInstruction", () =>
+        {
+            var provider = Providers.Gemini;
+            using var document = JsonDocument.Parse(Payload(Simple(provider), provider));
+            var root = document.RootElement;
+
+            Equal(1, root.GetProperty("contents").GetArrayLength(), "System zählt als Inhalt mit");
+            Equal("user", root.GetProperty("contents")[0].GetProperty("role").GetString(), "Rolle");
+            Equal("Kurz: was ist Strom?",
+                root.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString(), "Text");
+            Equal("Werde knapp.",
+                root.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString(),
+                "System-Vorgabe");
+            Equal(1234, root.GetProperty("generationConfig").GetProperty("maxOutputTokens").GetInt32(), "Token-Limit");
+            Equal(0.9, Math.Round(root.GetProperty("generationConfig").GetProperty("topP").GetDouble(), 4), "Top-P");
+            True(!root.TryGetProperty("messages", out _), "Gemini kennt keine messages");
+        });
+
+        Check("Anfrage: ohne Strom wird stream=false gesendet", () =>
+        {
+            foreach (var provider in Providers.All)
+            {
+                var json = Payload(Simple(provider, stream: false), provider);
+                True(!json.Contains("\"stream\":true", StringComparison.Ordinal), $"stream bleibt an bei {provider.Id}");
+            }
+        });
+
+        Check("Anfrage: Websuche nur bei Anbietern, die sie anbieten", () =>
+        {
+            var groq = Payload(Simple(Providers.Groq, webSearch: true), Providers.Groq);
+            True(groq.Contains("browser_search", StringComparison.Ordinal), "Groq bekommt kein Suchwerkzeug");
+            var openai = Payload(Simple(Providers.OpenAi, webSearch: true), Providers.OpenAi);
+            True(!openai.Contains("browser_search", StringComparison.Ordinal),
+                "OpenAI bekommt ein Suchwerkzeug, das es dort nicht gibt");
+        });
+
+        Check("Anfrage: Denk-Schritte werden nur dort angefordert, wo es sie gibt", () =>
+        {
+            var anthropic = Payload(Simple(Providers.Anthropic, thinking: true), Providers.Anthropic);
+            True(anthropic.Contains("\"thinking\"", StringComparison.Ordinal), "Anthropic bekommt kein Denken");
+            var gemini = Payload(Simple(Providers.Gemini, thinking: true), Providers.Gemini);
+            True(gemini.Contains("thinkingConfig", StringComparison.Ordinal), "Gemini bekommt kein Denken");
+            var openai = Payload(Simple(Providers.OpenAi, thinking: true), Providers.OpenAi);
+            True(!openai.Contains("thinkingConfig", StringComparison.Ordinal),
+                "OpenAI bekommt ein Feld, das es dort nicht gibt");
+        });
+
+        Check("Antwort: Denk-Schritte im Text landen nicht in der Antwort", () =>
+        {
+            var stream = new AiStream();
+            var answer = new StringBuilder();
+            stream.AddText("<think>erst überlegen", null);
+            stream.AddText("</think>Die Antwort.", piece => answer.Append(piece));
+            Equal("Die Antwort.", answer.ToString(), "Antwort");
+            Equal("erst überlegen", stream.Reasoning.ToString(), "Denk-Schritt");
+        });
+
+        Check("Antwort: ein unbekanntes Modell bleibt gültig", () =>
+        {
+            var provider = Providers.Groq;
+            Equal("voellig/neu", provider.Model("voellig/neu").Id, "eigener Modellname");
+            Equal(provider.Fast.Id, provider.Model("").Id, "leerer Name fällt zurück");
         });
     }
 
@@ -482,13 +675,13 @@ public static class SelfTest
         {
             var request = new AskRequest
             {
-                Model = GroqModels.Small.Id,
+                Model = Providers.Groq.Fast.Id,
                 Messages = new[] { new ChatMessage("system", "Hallo"), new ChatMessage("user", "Frage") },
                 MaxCompletionTokens = 2048,
                 ReasoningEffort = "medium",
             };
 
-            using var document = JsonDocument.Parse(GroqClient.BuildPayload(request));
+            using var document = JsonDocument.Parse(Payload(request));
             var root = document.RootElement;
             Equal("openai/gpt-oss-20b", root.GetProperty("model").GetString(), "Modell");
             True(root.GetProperty("stream").GetBoolean(), "stream=true");
@@ -501,12 +694,12 @@ public static class SelfTest
         {
             var request = new AskRequest
             {
-                Model = GroqModels.Large.Id,
+                Model = Providers.Groq.Strong.Id,
                 Messages = new[] { new ChatMessage("user", "Neuigkeiten?") },
                 WebSearch = true,
             };
 
-            using var document = JsonDocument.Parse(GroqClient.BuildPayload(request));
+            using var document = JsonDocument.Parse(Payload(request));
             var tools = document.RootElement.GetProperty("tools");
             Equal(1, tools.GetArrayLength(), "Werkzeuge");
             Equal("browser_search", tools[0].GetProperty("type").GetString(), "Werkzeugtyp");
@@ -516,13 +709,313 @@ public static class SelfTest
         {
             var request = new AskRequest
             {
-                Model = GroqModels.Small.Id,
+                Model = Providers.Groq.Fast.Id,
                 Messages = new[] { new ChatMessage("user", "x") },
             };
 
-            using var document = JsonDocument.Parse(GroqClient.BuildPayload(request));
+            using var document = JsonDocument.Parse(Payload(request));
             True(!document.RootElement.TryGetProperty("reasoning_effort", out _), "Feld sollte fehlen");
             True(!document.RootElement.TryGetProperty("tools", out _), "Werkzeuge sollten fehlen");
+        });
+    }
+
+    // ── Strom (mit Server auf der Schleife) ────────────────────────────────────
+
+    /// <summary>
+    /// Ein winziger Server auf der Schleife: er antwortet auf genau eine Anfrage
+    /// mit einem vorbereiteten Ereignisstrom. Damit lässt sich der ganze Weg
+    /// prüfen — Verbindung, Kopfzeilen, Strom, Nutzung, Abbruchgrund und Fehler —
+    /// ohne Netz, ohne Schlüssel und ohne Kosten.
+    /// </summary>
+    private sealed class LoopbackServer : IDisposable
+    {
+        private readonly TcpListener _listener;
+        private readonly Thread _thread;
+        private readonly byte[] _head;
+        private readonly byte[] _body;
+
+        public LoopbackServer(string body, int status = 200, string contentType = "text/event-stream", string? extraHeader = null)
+        {
+            _body = Encoding.UTF8.GetBytes(body);
+            var head = $"HTTP/1.1 {status} OK\r\nContent-Type: {contentType}\r\nConnection: close\r\n";
+            if (extraHeader is { Length: > 0 })
+            {
+                head += extraHeader + "\r\n";
+            }
+
+            _head = Encoding.UTF8.GetBytes(head + $"Content-Length: {_body.Length}\r\n\r\n");
+
+            _listener = new TcpListener(IPAddress.Loopback, 0);
+            _listener.Start();
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            _thread = new Thread(Serve) { IsBackground = true };
+            _thread.Start();
+        }
+
+        public int Port { get; }
+
+        public string BaseUrl => $"http://127.0.0.1:{Port}/v1";
+
+        /// <summary>Die Kopfzeilen der Anfrage, die angekommen ist (ohne Rumpf).</summary>
+        public string Request { get; private set; } = "";
+
+        /// <summary>Der Rumpf der Anfrage (die gesendete Frage).</summary>
+        public string Body { get; private set; } = "";
+
+        private void Serve()
+        {
+            try
+            {
+                using var client = _listener.AcceptTcpClient();
+                using var stream = client.GetStream();
+                stream.ReadTimeout = 4000;
+
+                var buffer = new byte[16 * 1024];
+                var read = 0;
+                var text = "";
+                while (read < 4 || text.IndexOf("\r\n\r\n", StringComparison.Ordinal) < 0)
+                {
+                    read = stream.Read(buffer, 0, buffer.Length);
+                    if (read <= 0)
+                    {
+                        break;
+                    }
+
+                    text += Encoding.UTF8.GetString(buffer, 0, read);
+                    if (text.Length > 64 * 1024)
+                    {
+                        break;
+                    }
+                }
+
+                var split = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+                Request = split < 0 ? text : text[..split];
+                Body = split < 0 ? "" : text[(split + 4)..];
+
+                // Auf den Rumpf warten, bis er vollständig ist.
+                if (text.Contains("Content-Length: ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var start = text.IndexOf("Content-Length: ", StringComparison.OrdinalIgnoreCase) + 16;
+                    var end = text.IndexOf('\r', start);
+                    if (int.TryParse(text[start..end], out var length) && length > 0)
+                    {
+                        while (Body.Length < length)
+                        {
+                            var more = stream.Read(buffer, 0, buffer.Length);
+                            if (more <= 0)
+                            {
+                                break;
+                            }
+
+                            Body += Encoding.UTF8.GetString(buffer, 0, more);
+                        }
+                    }
+                }
+
+                stream.Write(_head, 0, _head.Length);
+                stream.Write(_body, 0, _body.Length);
+                stream.Flush();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Schleifenserver: " + ex.Message);
+            }
+            finally
+            {
+                _listener.Stop();
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _listener.Stop();
+            }
+            catch
+            {
+                // schon zu
+            }
+        }
+    }
+
+    private static void TestStreams()
+    {
+        Check("Strom: ein OpenAI-kompatibler Anbieter wird Stück für Stück gelesen", () =>
+        {
+            const string body =
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hal\"}}]}\n\n" +
+                "data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\n" +
+                "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
+                "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":3}}\n\n" +
+                "data: [DONE]\n\n";
+
+            using var server = new LoopbackServer(body);
+            var pieces = new List<string>();
+            var provider = Providers.Groq;
+            var call = new AiCall(
+                provider, server.BaseUrl, "test-schluessel",
+                new AskRequest
+                {
+                    Model = provider.Fast.Id,
+                    Messages = new[] { new ChatMessage("user", "Sag Hallo") },
+                },
+                OnText: pieces.Add);
+
+            var result = AiClients.For(provider).StreamAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+
+            Equal("Hallo", result.Text, "Antwort");
+            Equal("Hal|lo", string.Join("|", pieces), "Stücke");
+            Equal(12, result.InputTokens, "Tokens der Frage");
+            Equal(3, result.OutputTokens, "Tokens der Antwort");
+            Equal("stop", result.FinishReason, "Grund");
+            True(!result.Cancelled && !result.Truncated, "Abbruch");
+            True(server.Request.StartsWith("POST /v1/chat/completions", StringComparison.Ordinal), "Adresse der Anfrage");
+            True(server.Request.Contains("Authorization: Bearer test-schluessel", StringComparison.OrdinalIgnoreCase),
+                "Kopfzeile mit dem Schlüssel");
+            True(server.Body.Contains("\"stream\":true", StringComparison.Ordinal), "stream im Rumpf");
+        });
+
+        Check("Strom: Anthropic wird über benannte Ereignisse gelesen", () =>
+        {
+            const string body =
+                "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":20,\"output_tokens\":0}}}\n\n" +
+                "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"kurz \u00fcberlegen\"}}\n\n" +
+                "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hallo\"}}\n\n" +
+                "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"input_tokens\":20,\"output_tokens\":7}}\n\n" +
+                "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+
+            using var server = new LoopbackServer(body);
+            var provider = Providers.Anthropic;
+            var call = new AiCall(
+                provider, server.BaseUrl, "sk-ant-test",
+                new AskRequest
+                {
+                    Model = provider.Strong.Id,
+                    Messages = new[] { new ChatMessage("system", "Werde knapp."), new ChatMessage("user", "Sag Hallo") },
+                });
+
+            var result = AiClients.For(provider).StreamAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+
+            Equal("Hallo", result.Text, "Antwort");
+            Equal("kurz überlegen", result.Reasoning, "Denk-Schritt");
+            Equal(20, result.InputTokens, "Tokens der Frage");
+            Equal(7, result.OutputTokens, "Tokens der Antwort");
+            Equal("stop", result.FinishReason, "Grund");
+            True(server.Request.StartsWith("POST /v1/messages", StringComparison.Ordinal), "Adresse der Anfrage");
+            True(server.Request.Contains("x-api-key: sk-ant-test", StringComparison.OrdinalIgnoreCase), "Kopfzeile x-api-key");
+            True(server.Request.Contains("anthropic-version: 2023-06-01", StringComparison.OrdinalIgnoreCase), "Fassung der Schnittstelle");
+        });
+
+        Check("Strom: Gemini wird aus Kandidaten-Teilen gelesen", () =>
+        {
+            const string body =
+                "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"erst denken\",\"thought\":true}]}}]}\n\n" +
+                "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hal\"}]}}]}\n\n" +
+                "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"lo\"}]},\"finishReason\":\"STOP\"}]}\n\n" +
+                "data: {\"usageMetadata\":{\"promptTokenCount\":9,\"candidatesTokenCount\":4}}\n\n";
+
+            using var server = new LoopbackServer(body);
+            var provider = Providers.Gemini;
+            var model = provider.Fast.Id;
+            var call = new AiCall(
+                provider, server.BaseUrl, "AIza-test",
+                new AskRequest
+                {
+                    Model = model,
+                    Messages = new[] { new ChatMessage("user", "Sag Hallo") },
+                });
+
+            var result = AiClients.For(provider).StreamAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+
+            Equal("Hallo", result.Text, "Antwort");
+            Equal("erst denken", result.Reasoning, "Denk-Schritt");
+            Equal(9, result.InputTokens, "Tokens der Frage");
+            Equal(4, result.OutputTokens, "Tokens der Antwort");
+            Equal("STOP", result.FinishReason, "Grund");
+            True(server.Request.StartsWith("POST /v1/models/" + Uri.EscapeDataString(model) + ":streamGenerateContent?alt=sse",
+                StringComparison.Ordinal), "Adresse der Anfrage: " + server.Request.Split('\n')[0]);
+            True(server.Request.Contains("x-goog-api-key: AIza-test", StringComparison.OrdinalIgnoreCase), "Kopfzeile mit dem Schlüssel");
+        });
+
+        Check("Strom: ein abgelehnter Schlüssel wird lesbar erklärt", () =>
+        {
+            using var server = new LoopbackServer(
+                "{\"error\":{\"message\":\"Invalid API key\"}}",
+                status: 401,
+                contentType: "application/json");
+
+            var provider = Providers.OpenAi;
+            var call = new AiCall(
+                provider, server.BaseUrl, "falsch",
+                new AskRequest
+                {
+                    Model = provider.Fast.Id,
+                    Messages = new[] { new ChatMessage("user", "Hallo") },
+                },
+                Attempts: 1);
+
+            Exception? error = null;
+            try
+            {
+                AiClients.For(provider).StreamAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+            True(error is AiException, "kein AiException: " + (error?.GetType().Name ?? "kein Fehler"));
+            var message = error?.Message ?? "";
+            True(message.Contains("401"), "Statuscode fehlt: " + message);
+            True(message.Contains(provider.Name), "Anbietername fehlt: " + message);
+            True(message.Contains("Invalid API key"), "Meldung des Anbieters fehlt: " + message);
+            True(error is AiException { Retryable: false }, "401 gilt als wiederholbar");
+        });
+
+        Check("Strom: die Modelle des Anbieters kommen als Liste an", () =>
+        {
+            using var server = new LoopbackServer(
+                "{\"data\":[{\"id\":\"gpt-oss:20b\"},{\"id\":\"gemma4\"}]}",
+                contentType: "application/json");
+
+            var provider = Providers.Ollama;
+            var call = new AiCall(
+                provider, server.BaseUrl, "",
+                new AskRequest { Model = provider.Fast.Id, Messages = Array.Empty<ChatMessage>() });
+
+            var names = AiClients.For(provider).ModelsAsync(call, CancellationToken.None).GetAwaiter().GetResult();
+            Equal(2, names.Count, "Modelle");
+            Equal("gpt-oss:20b", names[0], "erstes Modell");
+            Equal("gemma4", names[1], "zweites Modell");
+        });
+
+        Check("Strom: ein Abbruch behält den bisherigen Text", () =>
+        {
+            const string body =
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Angefangen\"}}]}\n\n" +
+                "data: {\"choices\":[{\"delta\":{\"content\":\" und noch mehr\"}}]}\n\n";
+
+            using var server = new LoopbackServer(body);
+            var provider = Providers.Groq;
+            var seen = new List<string>();
+            using var cancel = new CancellationTokenSource();
+            var call = new AiCall(
+                provider, server.BaseUrl, "test-schluessel",
+                new AskRequest
+                {
+                    Model = provider.Fast.Id,
+                    Messages = new[] { new ChatMessage("user", "Erzähl") },
+                },
+                OnText: piece =>
+                {
+                    seen.Add(piece);
+                    cancel.Cancel();
+                });
+
+            var result = AiClients.For(provider).StreamAsync(call, cancel.Token).GetAwaiter().GetResult();
+            True(result.Cancelled, "der Abbruch ist nicht angekommen");
+            Equal("Angefangen", result.Text, "bisheriger Text");
+            Equal(1, seen.Count, "Stücke nach dem Abbruch");
         });
     }
 
@@ -923,8 +1416,8 @@ public static class SelfTest
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
                 // Eine frühere Frage, damit die Liste wirklich beide Gruppen zeigt.
                 history.Add(new HistoryEntry("h-1", DateTimeOffset.Now, "Was ist Strom?",
-                    "Bewegte Ladung", GroqModels.Small.Id, 1, 1, 0));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                    "Bewegte Ladung", Providers.Groq.Fast.Id, 1, 1, 0));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
 
                 bar.ApplySettings();
@@ -949,7 +1442,7 @@ public static class SelfTest
                 bar.ShowTextForTest("Test", "**fett** und `code`");
                 True(bar.AnswerBlockCount > 0, "Antwortbereich blieb leer");
 
-                var result = new AskResult("Antwort", "", GroqModels.Small.Id, 100, 50, 0.000015, TimeSpan.FromSeconds(1.2), "stop", false, false);
+                var result = new AskResult("Antwort", "", Providers.Groq.Fast.Id, 100, 50, 0.000015, TimeSpan.FromSeconds(1.2), "stop", false, false);
                 True(MainWindow.FooterForTest(result).Contains("20b"), "Fußzeile ohne Modell");
 
                 bar.Close();
@@ -969,14 +1462,18 @@ public static class SelfTest
                 var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
                 settings.Hotkey = "Ctrl+Alt+K";
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var window = new SettingsWindow(settings, chat);
 
                 // Werte ändern und prüfen, dass sie sofort in den Einstellungen landen.
-                window.ApplyChoiceForTest("ModelBox", GroqModels.Small.Id);
-                Equal(GroqModels.Small.Id, settings.Model, "Modell aus dem Fenster");
+                window.ApplyChoiceForTest("ModelBox", Providers.Groq.Fast.Id);
+                Equal(Providers.Groq.Fast.Id, settings.Model, "Modell aus dem Fenster");
                 window.ApplySliderForTest("WidthSlider", 900);
                 Equal(900d, settings.WindowWidth, "Breite aus dem Fenster");
+
+                // Die Fassung im Fenster ist die, die wirklich gebaut wurde.
+                var version = (TextBlock)window.FindName("NavVersion")!;
+                True(version.Text.Contains("3.0.0"), $"Fassung im Fenster: {version.Text}");
 
                 // Die Einführung lässt sich aus den Einstellungen erneut öffnen.
                 window.SelectAreaForTest("verhalten");
@@ -1005,6 +1502,73 @@ public static class SelfTest
             }
         });
 
+        Check("Oberfläche: Anbieterwechsel stellt Modelle, Adresse und Schlüssel um", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-prov-").FullName;
+            try
+            {
+                var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
+                var window = new SettingsWindow(settings, chat);
+
+                // Alle Anbieter stehen zur Wahl — der Katalog ist die Liste.
+                Equal(Providers.All.Count, window.ItemTagsForTest("ProviderBox").Count, "Anbieter in der Liste");
+                True(window.HasItemForTest("ProviderBox", "anthropic"), "Anthropic fehlt");
+                True(window.HasItemForTest("ProviderBox", "gemini"), "Gemini fehlt");
+                True(window.HasItemForTest("ProviderBox", "ollama"), "Ollama fehlt");
+
+                // Bei Groq ein Modell wählen — die Wahl muss den Wechsel überleben.
+                window.ApplyChoiceForTest("ModelBox", Providers.Groq.Strong.Id);
+                Equal(Providers.Groq.Strong.Id, settings.ModelFor("groq"), "Groq-Wahl");
+
+                // Auf Anthropic umstellen: die Modellliste gehört dann dorthin.
+                window.ApplyChoiceForTest("ProviderBox", "anthropic");
+                Equal("anthropic", settings.Provider, "Anbieter aus dem Fenster");
+                True(window.HasItemForTest("ModelBox", Providers.Auto), "„Automatisch“ fehlt");
+                True(window.HasItemForTest("ModelBox", Providers.Anthropic.Fast.Id), "schnelles Claude-Modell fehlt");
+                True(window.HasItemForTest("ModelBox", Providers.Anthropic.Strong.Id), "starkes Claude-Modell fehlt");
+                True(!window.HasItemForTest("ModelBox", Providers.Groq.Fast.Id), "das Groq-Modell steht noch in der Liste");
+
+                // Die Wahl wird je Anbieter gemerkt.
+                window.ApplyChoiceForTest("ModelBox", Providers.Anthropic.Strong.Id);
+                Equal(Providers.Anthropic.Strong.Id, settings.ModelFor("anthropic"), "Modell je Anbieter");
+                window.ApplyChoiceForTest("ProviderBox", "groq");
+                Equal("groq", settings.Provider, "zurück zu Groq");
+                True(window.HasItemForTest("ModelBox", Providers.Groq.Fast.Id), "Groq-Modelle fehlen nach dem Zurückwechseln");
+                Equal(Providers.Groq.Strong.Id, settings.ModelFor("groq"), "Groq-Wahl bleibt erhalten");
+                Equal(Providers.Anthropic.Strong.Id, settings.ModelFor("anthropic"), "Anthropic-Wahl bleibt erhalten");
+
+                // Die neuen Regler landen in den Einstellungen.
+                window.ApplySliderForTest("TempSlider", 1.3);
+                Equal(1.3, Math.Round(settings.Temperature, 2), "Temperatur");
+                window.ApplySliderForTest("TopPSlider", 0.8);
+                Equal(0.8, Math.Round(settings.TopP, 2), "Top-P");
+                window.ApplySliderForTest("RetrySlider", 5);
+                Equal(5, settings.Retries, "Versuche");
+                window.ApplySliderForTest("TimeoutSlider", 300);
+                Equal(300, settings.TimeoutSeconds, "Wartezeit");
+                window.ApplySliderForTest("AnimIntensitySlider", 1.2);
+                Equal(1.2, Math.Round(settings.AnimationIntensity, 2), "Stärke der Bewegung");
+                window.ApplySliderForTest("CodeFontSlider", 15);
+                Equal(15d, settings.CodeFontSize, "Schrift im Code");
+                window.ApplySliderForTest("SuggestionSlider", 9);
+                Equal(9, settings.MaxSuggestions, "Vorschläge");
+
+                // Und die Schalter: Strom, Denken, Schatten, kompakte Zeilen.
+                window.ApplyChoiceForTest("HistoryBox", "1000");
+                Equal(1000, settings.HistoryEntries, "Einträge im Verlauf");
+                window.ApplyTextForTest("MaxTokensBox", "4096");
+                Equal(4096, settings.MaxTokensOverride, "Höchstlänge");
+
+                window.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
         Check("Oberfläche: Regler zeigt den gefüllten Teil in der Akzentfarbe", () =>
         {
             var folder = Directory.CreateTempSubdirectory("ailight-slider-").FullName;
@@ -1012,7 +1576,7 @@ public static class SelfTest
             {
                 var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var window = new SettingsWindow(settings, chat);
 
                 // Auf halben Weg stellen und wirklich zeichnen lassen.
@@ -1050,7 +1614,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings { MaxSuggestions = 6 };
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
                 bar.ApplySettings();
 
@@ -1105,7 +1669,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings { CornerRadius = 20, ShowMeta = false };
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
                 bar.ApplySettings();
 
@@ -1136,7 +1700,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings { AnimateBar = true };
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
 
                 // Außerhalb des Bildschirms zeigen: sichtbar wie im Betrieb, ohne Fokus zu klauen.
@@ -1172,7 +1736,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings { AnimateBar = false };
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
                 Shot.Show(bar);
 
@@ -1197,7 +1761,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings();
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
                 bar.ApplySettings();
 
@@ -1231,7 +1795,7 @@ public static class SelfTest
             {
                 var settings = new AppSettings();
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
                 bar.ApplySettings();
 
@@ -1269,7 +1833,7 @@ public static class SelfTest
             {
                 var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var window = new SettingsWindow(settings, chat);
 
                 // Ohne Fenster (der Weg, auf dem Prüfstand und Bilder rendern)
@@ -1315,8 +1879,8 @@ public static class SelfTest
                 var settings = new AppSettings { MaxSuggestions = 6 };
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
                 history.Add(new HistoryEntry("h-1", DateTimeOffset.Now, "Was ist Strom?",
-                    "Bewegte Ladung", GroqModels.Small.Id, 1, 1, 0));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                    "Bewegte Ladung", Providers.Groq.Fast.Id, 1, 1, 0));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var bar = new MainWindow(chat);
 
                 // Ein echtes (aber verstecktes) Fenster: nur dort läuft Bewegung.
@@ -1357,7 +1921,7 @@ public static class SelfTest
             {
                 var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
                 var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
-                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
                 var welcome = new WelcomeWindow(settings, chat);
 
                 Equal(7, welcome.StepKeysForTest.Count, "Schritte der Einführung");
@@ -1424,6 +1988,9 @@ public static class SelfTest
                 var file = Path.Combine(folder, "settings.json");
                 var settings = AppSettings.Load(file);
                 True(!settings.WelcomeSeen, "die Einführung käme ungefragt immer wieder");
+                True(!settings.TourSeen, "der Rundgang käme ohne Ende wieder");
+                settings.TourSeen = true;
+                True(AppSettings.Load(file).TourSeen, "der Vermerk zum Rundgang wurde nicht gespeichert");
 
                 // Beim Schließen setzt das Programm diesen Vermerk — hier wird
                 // geprüft, dass er wirklich in der Datei landet.
@@ -1434,6 +2001,167 @@ public static class SelfTest
             {
                 Directory.Delete(folder, recursive: true);
             }
+        });
+
+        // ── Rundgang ──────────────────────────────────────────────────────────
+
+        Check("Rundgang: das Loch gleitet auf der Hauskurve, kommt genau an und dunkelt nur außen ab", () =>
+        {
+            var screen = new Rect(0, 0, 1280, 800);
+            var stops = new[]
+            {
+                new TourStop("eins", "Erster Halt", "Der erste Text des Rundgangs steht hier.", new Rect(120, 120, 200, 60)),
+                new TourStop("zwei", "Zweiter Halt", "Der zweite Text des Rundgangs steht hier.", new Rect(700, 520, 320, 80)),
+            };
+
+            var wasEnabled = Motion.Enabled;
+            var wasFollowing = Motion.FollowSystem;
+            Motion.Enabled = true;
+            Motion.FollowSystem = false;
+            try
+            {
+                var overlay = new SpotlightOverlay(screen, stops);
+                Shot.Show(overlay);
+                overlay.Begin();
+
+                Equal(0, overlay.Index, "erster Halt");
+                Equal(Spotlight.Hole(stops[0].Target), overlay.HoleRect, "das Loch steht nicht über dem ersten Ziel");
+
+                // Der Auftritt ist eine Bewegung — erst danach ist das Bild ruhig.
+                True(WaitFor(overlay, () => overlay.RootOpacity >= 0.999), "die Ebene blendet nicht auf");
+
+                // Außen dunkel, innen frei: die Abdunklung hat wirklich ein Loch.
+                var hole = overlay.HoleRect;
+                var outside = Shot.PixelAt(overlay, 20, 700);
+                var inside = Shot.PixelAt(overlay, hole.Left + (hole.Width / 2), hole.Top + (hole.Height / 2));
+                True(outside.A > 100, $"außerhalb des Lochs wird nicht abgedunkelt: {outside}");
+                Equal((byte)0, inside.A, "im Loch liegt noch Abdunklung");
+                True(!overlay.CardRect.IntersectsWith(hole), $"die Karte verdeckt das Loch: {overlay.CardRect}");
+
+                // Weiter: das Loch wandert, es springt nicht.
+                overlay.NextForTest();
+                Equal(1, overlay.Index, "zweiter Halt");
+                var start = Spotlight.Hole(stops[0].Target);
+                var destination = Spotlight.Hole(stops[1].Target);
+                // Mitten im Weg nachsehen: das Loch ist weder am Start noch am Ziel.
+                var midway = WaitFor(overlay, () =>
+                {
+                    var here = overlay.HoleRect;
+                    return here.Left > start.Left + 4 && here.Left < destination.Left - 4;
+                });
+                True(midway, $"das Loch springt statt zu wandern: {overlay.HoleRect} (Start {start.Left}, Ziel {destination.Left})");
+
+                var arrived = WaitFor(overlay, () => Math.Abs(overlay.HoleRect.Left - destination.Left) < 0.01
+                    && Math.Abs(overlay.HoleRect.Top - destination.Top) < 0.01
+                    && Math.Abs(overlay.HoleRect.Width - destination.Width) < 0.01);
+                True(arrived, $"das Loch kommt nicht an: {overlay.HoleRect} statt {destination}");
+
+                // Am Ende geht die Ebene ganz weg — und das Fenster mit ihr.
+                overlay.Finish();
+                True(WaitFor(overlay, () => !overlay.IsVisible), "der Rundgang schließt sich nicht");
+            }
+            finally
+            {
+                Motion.Enabled = wasEnabled;
+                Motion.FollowSystem = wasFollowing;
+            }
+        });
+
+        Check("Rundgang: die Leiste kennt ihre Halte — und lässt weg, was gerade fehlt", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-tourbar-").FullName;
+            try
+            {
+                var settings = new AppSettings { MaxSuggestions = 6 };
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                history.Add(new HistoryEntry("h-1", DateTimeOffset.Now, "Was ist Strom?",
+                    "Bewegte Ladung", Providers.Groq.Fast.Id, 1, 1, 0));
+                var chat = new ChatService(settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+                Shot.Show(bar);
+                bar.ApplySettings();
+                True(WaitFor(bar, () => bar.SuggestionsVisibleForTest), "die Vorschläge standen nicht im Bild");
+
+                var stops = bar.TourStopsForTest;
+                Equal(4, stops.Count, "Halte des Rundgangs");
+                Equal("marke", stops[0].Key, "erster Halt");
+                Equal("eingabe", stops[1].Key, "zweiter Halt");
+                True(stops.All(stop => stop.Title.Length > 3 && stop.Text.Length > 40),
+                    "ein Halt erklärt zu wenig");
+                True(stops.All(stop => stop.Target.Width > 4 && stop.Target.Height > 4),
+                    "ein Halt zeigt auf eine leere Stelle");
+
+                // Jedes Ziel liegt wirklich im Bild der Leiste.
+                var barRect = new Rect(bar.Left, bar.Top, bar.ActualWidth, bar.ActualHeight);
+                True(stops.All(stop => stop.Target.IntersectsWith(barRect)), "ein Halt zeigt neben die Leiste");
+
+                // Läuft eine Frage, verschwinden die Vorschläge — dann fällt dieser Halt weg.
+                bar.BeginAskForTest("Was ist Strom?");
+                True(WaitFor(bar, () => !bar.SuggestionsVisibleForTest),
+                    "die Vorschläge stehen weiter im Bild, obwohl eine Frage läuft");
+                True(bar.TourStopsForTest.All(stop => stop.Key != "vorschlaege"),
+                    "der Rundgang zeigt weiter auf Vorschläge, die gar nicht dastehen");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Rundgang: das Loch umschließt das Ziel mit Rand und bleibt auf ganzen Pixeln", () =>
+        {
+            var target = new Rect(200, 100, 80, 40);
+            var hole = Spotlight.Hole(target);
+            True(hole.Contains(target), $"das Loch umschließt das Ziel nicht: {hole}");
+            Equal(200d - Spotlight.Padding, hole.Left, "linker Rand");
+            Equal(100d - Spotlight.Padding, hole.Top, "oberer Rand");
+            Equal(80d + (2 * Spotlight.Padding), hole.Width, "Breite");
+            Equal(40d + (2 * Spotlight.Padding), hole.Height, "Höhe");
+
+            // Ein Strich von einem Pixel wäre kein Blickfang — die Mindestgröße greift.
+            var point = Spotlight.Hole(new Rect(500, 400, 1, 1));
+            True(point.Width >= Spotlight.MinSize && point.Height >= Spotlight.MinSize,
+                $"das Loch ist kleiner als die Mindestgröße: {point}");
+            True(point.Contains(new Point(500.5, 400.5)), "die Mindestgröße wächst nicht um die Mitte herum");
+
+            // Ganze Pixel: eine Kante auf halben Pixeln flimmert beim Gleiten.
+            var odd = Spotlight.Hole(new Rect(10.4, 20.7, 33.3, 12.2));
+            Equal(Math.Floor(odd.Left), odd.Left, "linke Kante liegt nicht auf einem ganzen Pixel");
+            Equal(Math.Floor(odd.Top), odd.Top, "obere Kante liegt nicht auf einem ganzen Pixel");
+
+            // Ein zweiter Bildschirm links: die Ebene beginnt nicht bei null, das
+            // Loch muss trotzdem genau auf dem Ziel sitzen.
+            var secondScreen = new Rect(-1920, 0, 1920, 1080);
+            var far = new Rect(-1200, 300, 200, 60);
+            var local = Spotlight.InLayer(far, secondScreen);
+            Equal(720d, local.Left, "Ziel auf dem linken Bildschirm: linke Kante");
+            Equal(300d, local.Top, "Ziel auf dem linken Bildschirm: obere Kante");
+            True(Spotlight.Hole(local).Contains(local), "das Loch sitzt auf dem zweiten Bildschirm nicht am Ziel");
+        });
+
+        Check("Rundgang: die Karte weicht dem Loch aus und bleibt im Bild", () =>
+        {
+            var screen = new Rect(0, 0, 1280, 800);
+            var card = new Size(Spotlight.CardWidth, 120);
+
+            // Platz darunter: die Karte gehört unter das Loch.
+            var hole = new Rect(100, 100, 200, 60);
+            var below = Spotlight.PlaceCard(hole, card, screen);
+            True(below.Top >= hole.Bottom + Spotlight.Gap - 0.01, $"die Karte steht nicht unter dem Loch: {below}");
+            True(!below.IntersectsWith(hole), "die Karte verdeckt das Loch");
+
+            // Kein Platz darunter: sie weicht nach oben aus.
+            var low = new Rect(100, 740, 200, 50);
+            var above = Spotlight.PlaceCard(low, card, screen);
+            True(above.Bottom <= low.Top - Spotlight.Gap + 0.01, $"die Karte weicht dem Loch nicht aus: {above}");
+            True(!above.IntersectsWith(low), "die Karte verdeckt das Loch oben");
+            True(above.Top >= screen.Top, $"die Karte steht über dem Bildrand: {above}");
+
+            // Am rechten Rand bleibt sie im Bild.
+            var edge = Spotlight.PlaceCard(new Rect(1240, 100, 120, 60), card, screen);
+            True(edge.Right <= screen.Right - Spotlight.Margin + 0.01, $"die Karte ragt aus dem Bild: {edge}");
         });
 
         Check("Symbol: das Infobereich-Symbol lädt (Datei oder eingebettet)", () =>

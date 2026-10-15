@@ -258,15 +258,15 @@
                                             Margin="0,8,0,20"
                                             FontSize="14"
                                             Foreground="{DynamicResource Brush.Muted}"
-                                            Text="AIlight rechnet nicht selbst: es fragt ein Modell bei Groq. Dafür brauchst du einen eigenen API-Schlüssel — er ist kostenlos und in einer Minute erstellt."
+                                            Text="AIlight rechnet nicht selbst: es fragt ein Modell. Von Haus aus ist das Groq — in den Einstellungen lässt sich jeder andere bekannte Anbieter wählen: OpenAI, Anthropic (Claude), Google Gemini, Mistral, DeepSeek, xAI, OpenRouter, Together, Perplexity, Azure oder ein Server auf diesem Rechner. Dafür brauchst du einen eigenen API-Schlüssel."
                                             TextWrapping="Wrap" />
 
                                         <Border Style="{StaticResource Card}">
                                             <StackPanel>
                                                 <TextBlock Style="{StaticResource Title}" Text="In drei Schritten" />
-                                                <TextBlock Margin="0,10,0,0" Style="{StaticResource Point}" Text="1.  Auf console.groq.com/keys ein Konto anlegen (oder anmelden)." />
-                                                <TextBlock Style="{StaticResource Point}" Text="2.  „Create API Key“ drücken und den Schlüssel kopieren — er beginnt mit gsk_." />
-                                                <TextBlock Style="{StaticResource Point}" Text="3.  In den Einstellungen unter „Konto“ einfügen und mit „Schlüssel testen“ prüfen." />
+                                                <TextBlock Margin="0,10,0,0" Style="{StaticResource Point}" Text="1.  In den Einstellungen unter „Konto“ den Anbieter wählen (Vorgabe: Groq)." />
+                                                <TextBlock Style="{StaticResource Point}" Text="2.  Auf der Seite des Anbieters ein Konto anlegen und einen Schlüssel erstellen — der Knopf unten führt direkt dorthin." />
+                                                <TextBlock Style="{StaticResource Point}" Text="3.  Den Schlüssel unter „Konto“ einfügen, speichern und mit „Schlüssel testen“ prüfen lassen." />
                                                 <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                                                     <Button
                                                         Click="OnOpenKeys"
@@ -552,7 +552,7 @@
                                             Margin="0,8,0,20"
                                             FontSize="14"
                                             Foreground="{DynamicResource Brush.Muted}"
-                                            Text="AIlight startet mit Windows mit und wartet im Infobereich auf den nächsten Ruf. Beim ersten Start öffnet sich die Leiste von selbst."
+                                            Text="AIlight startet mit Windows mit und wartet im Infobereich auf den nächsten Ruf. Gleich zeigt sich die Leiste, und ein kurzer Rundgang erklärt dir ihre Teile Schritt für Schritt — du kannst ihn jederzeit mit Esc beenden."
                                             TextWrapping="Wrap" />
 
                                         <Border Style="{StaticResource Card}">
@@ -581,11 +581,21 @@
 
                                         <Border Style="{StaticResource Card}">
                                             <StackPanel>
+                                                <TextBlock Style="{StaticResource Title}" Text="Der Rundgang" />
+                                                <TextBlock
+                                                    Margin="0,8,0,0"
+                                                    Style="{StaticResource Subtitle}"
+                                                    Text="Gleich nach dieser Einführung dunkelt der Bildschirm kurz ab, und ein Loch wandert über die Leiste: Zeichen, Eingabe, Vorschläge, Fußzeile. Weiter mit Klick, Enter oder rechts, zurück mit links, beenden mit Esc." />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
                                                 <TextBlock Style="{StaticResource Title}" Text="Noch einmal ansehen" />
                                                 <TextBlock
                                                     Margin="0,8,0,0"
                                                     Style="{StaticResource Subtitle}"
-                                                    Text="Diese Einführung öffnet sich nur beim ersten Start. Später findest du sie jederzeit wieder: /welcome in der Leiste, im Menü des Infobereich-Symbols oder in den Einstellungen unter „Verhalten“." />
+                                                    Text="Diese Einführung öffnet sich nur beim ersten Start. Später findest du alles jederzeit wieder: /welcome und /rundgang in der Leiste, die Einträge im Menü des Infobereich-Symbols oder in den Einstellungen unter „Verhalten“." />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>

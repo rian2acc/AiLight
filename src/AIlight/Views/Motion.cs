@@ -113,6 +113,22 @@ public static class Motion
     /// <summary>Soll der Systemschalter mitzählen? (Standard: ja.)</summary>
     public static bool FollowSystem { get; set; } = true;
 
+    /// <summary>
+    /// Wie lebendig die Bewegung ist. 1 ist das Haus; darunter wird alles ruhiger
+    /// (0,6 = fast nur noch ein Überblenden), darüber lebhafter. Die Einstellung
+    /// liegt in den Einstellungen unter „Aussehen“.
+    /// </summary>
+    public static double Intensity { get; set; } = 1;
+
+    /// <summary>
+    /// Eine Hauszeit auf die eingestellte Lebendigkeit umrechnen. Alles läuft
+    /// durch diese eine Stelle — deshalb wirkt die Einstellung überall gleich.
+    /// </summary>
+    public static int Scaled(int milliseconds)
+        => Math.Abs(Intensity - 1) < 0.005
+            ? milliseconds
+            : (int)Math.Round(Math.Clamp(milliseconds * Intensity, 40, 2000));
+
     /// <summary>Meldet Windows, dass Animationen erwünscht sind?</summary>
     public static bool SystemAllows
     {
@@ -132,8 +148,8 @@ public static class Motion
     /// <summary>Darf jetzt bewegt werden? (Einstellung, System und Zeitgeber zusammen.)</summary>
     public static bool Moves => Enabled && (!FollowSystem || SystemAllows);
 
-    /// <summary>Eine Dauer in WPF-Zeit.</summary>
-    public static Duration After(int milliseconds) => new(TimeSpan.FromMilliseconds(milliseconds));
+    /// <summary>Eine Dauer in WPF-Zeit — mit der eingestellten Lebendigkeit.</summary>
+    public static Duration After(int milliseconds) => new(TimeSpan.FromMilliseconds(Scaled(milliseconds)));
 
     /// <summary>Ein Ein-/Ausblenden mit der Hauskurve.</summary>
     public static DoubleAnimation Fade(double from, double to, int milliseconds, IEasingFunction? easing = null)

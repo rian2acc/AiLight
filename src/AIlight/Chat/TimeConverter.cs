@@ -1,8 +1,8 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AIlight.Groq;
+namespace AIlight.Chat;
 
 /// <summary>
 /// Zeitstempel tolerant lesen. Ältere Verlaufsdateien speicherten die Zeit als

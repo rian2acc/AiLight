@@ -1,15 +1,17 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
+using AIlight.Ai;
 using AIlight.Core;
 
-namespace AIlight.Groq;
+namespace AIlight.Chat;
 
 /// <summary>Eine Runde im Gespräch (Frage und Antwort).</summary>
 public sealed record Round(string Question, string Answer);
 
 /// <summary>
-/// Verbindet Einstellungen, Gedächtnis, Verlauf und den HTTP-Client.
-/// Die Oberfläche ruft nur noch <see cref="AskAsync"/> und zeigt an, was ankommt.
+/// Verbindet Einstellungen, Gedächtnis, Verlauf und den Klienten des gewählten
+/// Anbieters. Die Oberfläche ruft nur noch <see cref="AskAsync"/> und zeigt an,
+/// was ankommt — welcher Anbieter dahinter steckt, entscheidet die Einstellung.
 /// </summary>
 public sealed class ChatService
 {
@@ -21,24 +23,65 @@ public sealed class ChatService
 
     private readonly List<Round> _rounds = new();
     private readonly object _gate = new();
+    private readonly string _conversationPath;
 
-    public ChatService(GroqClient client, AppSettings settings, HistoryStore history, string? conversationPath = null)
+    public ChatService(AppSettings settings, HistoryStore history, string? conversationPath = null)
     {
-        Client = client;
         Settings = settings;
         History = history;
         _conversationPath = conversationPath ?? Paths.ConversationFile;
         Load();
     }
 
-    private readonly string _conversationPath;
-
-    public GroqClient Client { get; }
     public AppSettings Settings { get; }
     public HistoryStore History { get; }
 
     /// <summary>Wird bei jeder neuen Antwort ausgelöst (für Tray-Hinweise usw.).</summary>
     public event Action<HistoryEntry>? Answered;
+
+    /// <summary>Der Anbieter, mit dem gerade gesprochen wird.</summary>
+    public ProviderInfo Provider => Providers.Find(Settings.Provider);
+
+    /// <summary>Die Adresse, die wirklich benutzt wird (eigene Angabe schlägt den Katalog).</summary>
+    public string BaseUrl
+    {
+        get
+        {
+            var own = (Settings.BaseUrl ?? "").Trim();
+            return own.Length > 0 ? own.TrimEnd('/') : Provider.BaseUrl;
+        }
+    }
+
+    public string ApiKey => SecretStore.Read(Provider.Id);
+
+    /// <summary>Braucht dieser Anbieter überhaupt einen Schlüssel? (Lokale Server nicht.)</summary>
+    public bool NeedsKey => Provider.NeedsKey;
+
+    /// <summary>Ist alles da, was eine Frage braucht?</summary>
+    public bool HasKey => !Provider.NeedsKey || ApiKey.Length > 0;
+
+    /// <summary>Ein lesbarer Satz, wenn etwas fehlt — sonst leer.</summary>
+    public string KeyProblem
+    {
+        get
+        {
+            if (!Provider.NeedsKey)
+            {
+                return "";
+            }
+
+            if (Provider.BaseUrlRequired && (Settings.BaseUrl ?? "").Trim().Length == 0)
+            {
+                return $"{Provider.Name} braucht eine eigene Adresse — bitte in den Einstellungen "
+                       + "unter „Konto“ eintragen.";
+            }
+
+            return ApiKey.Length > 0
+                ? ""
+                : $"Für {Provider.Name} ist noch kein API-Schlüssel hinterlegt. Öffne die Einstellungen "
+                  + "(Strg+,), Bereich „Konto“, und trage ihn dort ein.";
+        }
+    }
 
     public IReadOnlyList<Round> Rounds
     {
@@ -50,9 +93,6 @@ public sealed class ChatService
             }
         }
     }
-
-    public bool HasKey => SecretStore.HasKey();
-    public string ApiKey => SecretStore.Read();
 
     /// <summary>System-Nachricht, die wirklich gesendet wird.</summary>
     public string SystemPrompt(string context = "")
@@ -84,30 +124,43 @@ public sealed class ChatService
         Action<string>? onReasoning,
         CancellationToken token)
     {
-        var apiKey = ApiKey;
-        if (apiKey.Length == 0)
+        var provider = Provider;
+        var problem = KeyProblem;
+        if (problem.Length > 0)
         {
-            throw new GroqException(
-                "Es ist noch kein API-Schlüssel hinterlegt. Öffne die Einstellungen (Strg+,) "
-                + "und trage dort deinen Groq-Schlüssel ein.", retryable: false);
+            throw new AiException(problem, retryable: false);
         }
 
-        var (model, reason) = GroqModels.Resolve(Settings.Model, question, Settings.WebSearch);
+        var setting = Settings.ModelFor(provider.Id);
+        var (model, reason) = Providers.Resolve(provider, setting, question, Settings.WebSearch);
         var messages = BuildMessages(question, context);
-        Log.Info($"Frage an {model.Id} ({reason}, {messages.Count} Nachrichten, Textlänge {question.Length})");
+        Log.Info($"Frage an {provider.Name}/{model.Id} ({reason}, {messages.Count} Nachrichten, "
+            + $"Textlänge {question.Length})");
 
         var request = new AskRequest
         {
             Model = model.Id,
             Messages = messages,
-            MaxCompletionTokens = Settings.MaxCompletionTokens,
+            MaxCompletionTokens = Settings.EffectiveMaxTokens,
             ReasoningEffort = Settings.Reasoning,
-            WebSearch = Settings.WebSearch,
+            WebSearch = Settings.WebSearch && provider.WebSearch,
+            Temperature = Settings.Temperature,
+            TopP = Settings.TopP,
+            Thinking = Settings.ExtendedThinking,
+            Stream = Settings.Streaming,
         };
 
-        var result = await Client
-            .StreamAsync(apiKey, request, onText, onReasoning, token)
-            .ConfigureAwait(false);
+        var call = new AiCall(
+            provider,
+            BaseUrl,
+            ApiKey,
+            request,
+            onText,
+            onReasoning,
+            Settings.Retries,
+            TimeSpan.FromSeconds(Settings.TimeoutSeconds));
+
+        var result = await AiClients.For(provider).StreamAsync(call, token).ConfigureAwait(false);
 
         if (result.Cancelled || result.Text.Trim().Length == 0)
         {
@@ -130,7 +183,7 @@ public sealed class ChatService
             result.OutputTokens,
             result.CostUsd);
         History.Add(entry);
-        History.Prune(Settings.KeepHistoryDays);
+        History.Prune(Settings.KeepHistoryDays, Settings.HistoryEntries);
         SaveLastAnswer(entry);
         Answered?.Invoke(entry);
         return result;
@@ -148,6 +201,38 @@ public sealed class ChatService
             onText,
             onReasoning,
             token);
+
+    /// <summary>Schlüssel prüfen — derselbe Weg wie eine Frage, nur winzig.</summary>
+    public Task<string> TestKeyAsync(string apiKey, CancellationToken token)
+    {
+        var provider = Provider;
+        var call = new AiCall(
+            provider,
+            BaseUrl,
+            apiKey,
+            new AskRequest
+            {
+                Model = provider.Fast.Id,
+                Messages = Array.Empty<ChatMessage>(),
+                Stream = false,
+            },
+            Attempts: 1);
+
+        return AiClients.For(provider).TestKeyAsync(call, token);
+    }
+
+    /// <summary>Die Modelle abfragen, die der Anbieter (oder ein lokaler Server) anbietet.</summary>
+    public Task<IReadOnlyList<string>> AvailableModelsAsync(CancellationToken token)
+    {
+        var provider = Provider;
+        var call = new AiCall(provider, BaseUrl, ApiKey, new AskRequest
+        {
+            Model = provider.Fast.Id,
+            Messages = Array.Empty<ChatMessage>(),
+        });
+
+        return AiClients.For(provider).ModelsAsync(call, token);
+    }
 
     private List<ChatMessage> BuildMessages(string question, string context)
     {

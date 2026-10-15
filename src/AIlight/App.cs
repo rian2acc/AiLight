@@ -1,10 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using AIlight.Ai;
 using AIlight.Core;
-using AIlight.Groq;
+using AIlight.Chat;
 using AIlight.Views;
 using Microsoft.Win32;
 using Application = System.Windows.Application;
@@ -29,7 +30,6 @@ public sealed class App : Application
     private WelcomeWindow? _welcome;
     private TrayIcon? _tray;
     private HotKey? _hotkey;
-    private GroqClient? _client;
     private Report? _report;
     private string _hotkeyProblem = "";
     private ToolStripMenuItemHost? _autostartItem;
@@ -98,15 +98,18 @@ public sealed class App : Application
         Log.Info($"AIlight startet (Version {GetType().Assembly.GetName().Version}, {_options.Summary})");
         Trace("einstellungen");
 
-        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily, Settings.CompactRows);
 
         // Der Bewegungsschalter gilt für alle Fenster — deshalb steht er hier und
         // nicht erst in der Leiste (die es in diesem Moment noch gar nicht gibt).
         Motion.Enabled = Settings.AnimateBar;
 
-        _client = new GroqClient();
+        // Der Klient gehört zur Form des Anbieters: OpenAI-kompatibel, Anthropic
+        // oder Gemini. Er wird bei jeder Frage neu aus der Einstellung gewählt
+        // (siehe ChatService) — so wirkt ein Anbieterwechsel sofort.
         History = new HistoryStore(Paths.HistoryFile);
-        Chat = new ChatService(_client, Settings, History);
+        Chat = new ChatService(Settings, History);
+        Motion.Intensity = Settings.AnimationIntensity;
         Trace("dienste");
 
         InstallExceptionHandling();
@@ -207,6 +210,15 @@ public sealed class App : Application
             Trace("leiste_gezeigt");
         }
 
+        if (_options.Tour)
+        {
+            // Der Rundgang braucht eine stehende Leiste: er erklärt sie selbst.
+            ShowBar();
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() => EnsureBar().StartTour()));
+            Trace("rundgang_gezeigt");
+        }
     }
 
     /// <summary>
@@ -228,7 +240,9 @@ public sealed class App : Application
     /// </summary>
     private void ShowWelcomeOnFirstStart()
     {
-        if (IsMeasurementMode)
+        // Wer den Rundgang ausdrücklich angefordert hat (--tour), will ihn sehen —
+        // die Einführung würde sonst darüber aufklappen.
+        if (IsMeasurementMode || _options.Tour)
         {
             return;
         }
@@ -257,9 +271,12 @@ public sealed class App : Application
         Log.Info("Kein API-Schlüssel hinterlegt — Einstellungen werden geöffnet");
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
         {
+            var provider = Chat.Provider;
             _tray?.ShowBalloon("AIlight",
-                "Fast fertig: Trage im Einstellungsfenster deinen Groq-Schlüssel ein "
-                + "(console.groq.com/keys) und klicke auf „Schlüssel testen“.");
+                provider.NeedsKey
+                    ? $"Fast fertig: Trage im Einstellungsfenster deinen Schlüssel für {provider.Name} ein "
+                      + $"({provider.KeyUrl}) und klicke auf „Schlüssel testen“."
+                    : $"Gefragt wird über {provider.Name} — läuft der Server, kann es sofort losgehen.");
             OpenSettings("konto");
         }));
     }
@@ -280,8 +297,22 @@ public sealed class App : Application
             _welcome.Closed += (_, _) =>
             {
                 _welcome = null;
+
                 // Gesehen ist gesehen: sie soll nicht bei jedem Start wiederkommen.
+                var firstTime = !Settings.WelcomeSeen;
                 Settings.WelcomeSeen = true;
+
+                // Direkt danach zeigt sich die Leiste und der Rundgang erklärt sie
+                // an Ort und Stelle — die Einführung beschreibt, der Rundgang zeigt.
+                if (firstTime && !IsMeasurementMode && !Settings.TourSeen)
+                {
+                    Settings.TourSeen = true;
+                    Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+                    {
+                        ShowBar();
+                        EnsureBar().StartTour();
+                    }));
+                }
             };
         }
 
@@ -401,7 +432,25 @@ public sealed class App : Application
             case nameof(AppSettings.CornerRadius):
             case nameof(AppSettings.FontFamily):
                 Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity,
-                    Settings.CornerRadius, Settings.FontFamily);
+                    Settings.CornerRadius, Settings.FontFamily, Settings.CompactRows);
+                _bar?.ApplySettings();
+                break;
+
+            case nameof(AppSettings.AnimationIntensity):
+                // Die Stärke gilt für jedes Fenster — auch für das, das gerade offen ist.
+                Motion.Intensity = Settings.AnimationIntensity;
+                break;
+
+            case nameof(AppSettings.CompactRows):
+            case nameof(AppSettings.ShowShadow):
+            case nameof(AppSettings.CodeFontSize):
+            case nameof(AppSettings.ClearInputAfterSend):
+            case nameof(AppSettings.Provider):
+            case nameof(AppSettings.BaseUrl):
+                // Der Anbieter steht in der Fußzeile, die Zeilen haben eine andere
+                // Höhe, der Schatten fehlt vielleicht: alles Sache der Leiste.
+                Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity,
+                    Settings.CornerRadius, Settings.FontFamily, Settings.CompactRows);
                 _bar?.ApplySettings();
                 break;
 
@@ -448,6 +497,11 @@ public sealed class App : Application
                 EnsureBar().ShowHistoryFromTray();
             });
             _tray.AddItem("Einführung …", OpenWelcome);
+            _tray.AddItem("Rundgang …", () =>
+            {
+                ShowBar();
+                EnsureBar().StartTour();
+            });
             _tray.AddSeparator();
             var item = _tray.AddCheck("Mit Windows starten", Settings.StartWithWindows, value => Settings.StartWithWindows = value);
             _autostartItem = new ToolStripMenuItemHost(item);
@@ -586,7 +640,7 @@ public sealed class App : Application
             report.Line($"ask: antwort={result.Text}");
             report.Line($"ask: meta={AIlight.MainWindow.FooterForTest(result)}");
         }
-        catch (GroqException ex)
+        catch (AiException ex)
         {
             report.Line($"ask: fehler={ex.Message}");
             code = 3;
@@ -706,7 +760,7 @@ public sealed class App : Application
             SaveSettingsShot(folder, "hell", area);
         }
 
-        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily, Settings.CompactRows);
 
         // Die Einführung: alle sieben Schritte dunkel, der erste auch hell.
         foreach (var step in new[] { "willkommen", "schluessel", "hotkey", "fragen", "befehle", "aussehen", "fertig" })
@@ -715,7 +769,7 @@ public sealed class App : Application
         }
 
         SaveWelcomeShot(folder, "hell", "willkommen");
-        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily);
+        Theme.Apply(Settings.Theme, Settings.Accent, Settings.Opacity, Settings.CornerRadius, Settings.FontFamily, Settings.CompactRows);
 
         SaveBarShot(folder, "leiste-vorschlaege.png", "", "", "");
         SaveBarShot(
@@ -728,7 +782,62 @@ public sealed class App : Application
             + "```python\nprint(230 * 16)\n```",
             "gpt-oss-20b · 240 → 96 Tokens · unter $0,0001 · 0,7 s");
 
+        SaveTourShot(folder);
+
         Log.Info($"Bildschirmfotos geschrieben nach {folder}");
+    }
+
+    /// <summary>
+    /// Bilder vom Rundgang. Er liegt später als eigenes Fenster über dem ganzen
+    /// Bildschirm — zwei Fenster lassen sich aber nicht in ein Bild bringen.
+    /// Deshalb wird eine Leiste ohne Fenster gemessen und gezeichnet und die
+    /// Ebene darüber gelegt: dasselbe Bild, nur in einem Stück.
+    /// </summary>
+    private void SaveTourShot(string folder)
+    {
+        var bar = new MainWindow(Chat);
+        if (bar.Content is not FrameworkElement root)
+        {
+            bar.Close();
+            return;
+        }
+
+        bar.Content = null;
+        bar.FillForShot("", "", "");
+        Shot.Measure(root, Settings.WindowWidth);
+
+        var stops = bar.TourStopsInBar();
+        if (stops.Count == 0)
+        {
+            Log.Info("Kein Rundgang-Bild: die Leiste kennt keine Halte");
+            bar.Close();
+            return;
+        }
+
+        var barImage = Path.Combine(folder, "leiste-als-bild.png");
+        Shot.SaveElement(root, barImage, Settings.WindowWidth);
+
+        // Der Ausschnitt ist die Leiste mit etwas Rand — so bleibt das Bild klein.
+        // Die Koordinaten der Leiste beginnen bei null; der Ausschnitt schiebt sie
+        // nur nach innen (dieselbe Verschiebung rechnet Spotlight.InLayer).
+        const double air = 90;
+        var crop = new Rect(-air, -air, root.ActualWidth + (2 * air), root.ActualHeight + (2 * air));
+        var place = new Rect(0, 0, root.ActualWidth, root.ActualHeight);
+
+        var wanted = new[] { ("eingabe", "rundgang-eingabe.png"), ("vorschlaege", "rundgang-vorschlaege.png") };
+        var list = stops.ToList();
+        foreach (var (key, name) in wanted)
+        {
+            var index = list.FindIndex(stop => stop.Key == key);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            SpotlightOverlay.SaveShot(Path.Combine(folder, name), barImage, place, crop, stops, index);
+        }
+
+        bar.Close();
     }
 
     /// <summary>Ein Bild der Einstellungen in einer Farbstimmung.</summary>
@@ -845,7 +954,6 @@ public sealed class App : Application
             _hotkey?.Dispose();
             _tray?.Dispose();
             _trayIconImage?.Dispose();
-            _client?.Dispose();
             // Die Einzelinstanz gehört dem Einstiegspunkt (Program) — dort wird sie freigegeben.
             _report?.Dispose();
             Log.Info("AIlight beendet");

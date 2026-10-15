@@ -1,10 +1,10 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using AIlight.Core;
 
-namespace AIlight.Groq;
+namespace AIlight.Chat;
 
 /// <summary>Ein gespeicherter Austausch.</summary>
 public sealed record HistoryEntry(
@@ -152,16 +152,25 @@ public sealed class HistoryStore
     }
 
     /// <summary>Alte Einträge entfernen (<paramref name="keepDays"/> 0 = alles behalten).</summary>
-    public int Prune(int keepDays)
+    public int Prune(int keepDays, int keepEntries = 0)
     {
-        if (keepDays <= 0)
+        var all = All();
+        var keep = keepDays > 0
+            ? all.Where(e => e.At >= DateTimeOffset.Now.AddDays(-keepDays)).ToList()
+            : all.ToList();
+
+        // Zusätzlich die Zahl begrenzen: sonst wächst die Datei allein durch
+        // viele Fragen an einem Tag weiter, ohne dass die Aufbewahrung greift.
+        if (keepEntries > 0 && keep.Count > keepEntries)
+        {
+            keep = keep.TakeLast(keepEntries).ToList();
+        }
+
+        if (keep.Count == all.Count)
         {
             return 0;
         }
 
-        var limit = DateTimeOffset.Now.AddDays(-keepDays);
-        var all = All();
-        var keep = all.Where(e => e.At >= limit).ToList();
         Write(keep);
         return all.Count - keep.Count;
     }

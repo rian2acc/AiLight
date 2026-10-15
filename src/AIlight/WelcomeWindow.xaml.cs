@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -8,7 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using AIlight.Core;
-using AIlight.Groq;
+using AIlight.Chat;
 using AIlight.Views;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
@@ -525,7 +525,7 @@ public partial class WelcomeWindow : Window
     // ── Verweise nach draußen ───────────────────────────────────────────────
 
     private void OnOpenKeys(object sender, RoutedEventArgs e)
-        => Open("https://console.groq.com/keys");
+        => Open(Ai.Providers.Find(_settings.Provider).KeyUrl);
 
     private void OnOpenAccount(object sender, RoutedEventArgs e) => OpenSettings("konto");
 
