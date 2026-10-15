@@ -1,12 +1,14 @@
 """Erzeugt das Programmsymbol `packaging/ailight.ico` (reproduzierbar).
 
-Die Marke: ein Lichtstrahl, der aus einem leuchtenden Punkt nach oben
-aufgeht — „AIlight“ als Bild, klar unterscheidbar von den üblichen
-vierstrahligen KI-Funkeln. Auf einer abgerundeten Fläche in der
-Akzentfarbe, dieselbe Marke, die das Programm notfalls selbst zeichnet.
+Die Marke: ein leuchtender Punkt oben, daraus gehen drei Strahlen nach unten.
+Die beiden äußeren Strahlen mit dem Querstrich dazwischen bilden ein **A**, der
+mittlere Strahl ist das **I** — „AI“ als ein einziges Bild, aus dem Namen
+AIlight. Auf einer abgerundeten Fläche in der Akzentfarbe; dieselbe Marke
+zeichnet das Programm notfalls selbst (Core/Icons.cs) und als Vektorgrafik
+liegt sie in Views/Theme.xaml.
 
 Aufruf:
-    python tools/make_icon.py            # schreibt packaging/ailight.ico
+    python tools/make_icon.py            # packaging/ailight.ico + docs/bilder/logo.png
 """
 
 from __future__ import annotations
@@ -26,7 +28,21 @@ HALO = (0xE8, 0xF1, 0xFF)
 SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 SUPERSAMPLE = 4
 
-OUT = Path(__file__).resolve().parent.parent / "packaging" / "ailight.ico"
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "packaging" / "ailight.ico"
+LOGO = ROOT / "docs" / "bilder" / "logo.png"
+
+# ── Die Marke in einem Raster von 100 × 100 ────────────────────────────────
+# Damit Vektorgrafik (Theme.xaml), Notfallzeichnung (Icons.cs) und dieses
+# Symbol dieselbe Form haben, stehen die Maße nur hier.
+POINT = (50.0, 14.0, 9.5)       # Lichtpunkt: Mitte x, Mitte y, Radius
+STROKE = 11.0                    # Strichstärke der Strahlen
+RAYS = [
+    ((50.0, 32.0), (50.0, 90.0)),   # mittlerer Strahl — das I
+    ((44.0, 32.0), (22.0, 90.0)),   # linker Schenkel des A
+    ((56.0, 32.0), (78.0, 90.0)),   # rechter Schenkel des A
+    ((30.0, 68.0), (70.0, 68.0)),   # Querstrich zwischen den Schenkeln
+]
 
 
 def render(size: int) -> Image.Image:
@@ -48,56 +64,61 @@ def render(size: int) -> Image.Image:
     bottom = Image.new("RGBA", (s, s), (*ACCENT_BOTTOM, 255))
     image.paste(Image.composite(bottom, top, gradient), (0, 0), face)
 
-    center_x = s * 0.5
-    orb_y = s * (0.79 if small else 0.80)
-    orb_r = s * (0.125 if small else 0.108)
+    # Das Raster von 100 × 100 in die Fläche übertragen. Kleine Größen bekommen
+    # eine etwas größere Marke, sonst verschwinden die Zwischenräume.
+    box = s * (0.70 if small else 0.64)
+    origin = (s - box) / 2.0
+    stroke = box * (STROKE / 100.0) * (1.12 if small else 1.0)
 
-    # ── Lichtstrahl: unten schmal, nach oben offen, nach oben verblassend ──
-    beam = Image.new("L", (s, s), 0)
-    draw = ImageDraw.Draw(beam)
-    top_y = s * (0.155 if small else 0.15)
-    bottom_y = orb_y - orb_r * 0.55
-    width_top = s * (0.215 if small else 0.20)
-    width_bottom = s * (0.052 if small else 0.042)
-    draw.polygon(
-        [
-            (center_x - width_top, top_y),
-            (center_x + width_top, top_y),
-            (center_x + width_bottom, bottom_y),
-            (center_x - width_bottom, bottom_y),
-        ],
-        fill=255,
-    )
-    beam = beam.filter(ImageFilter.GaussianBlur(s * (0.014 if small else 0.011)))
+    def point(x: float, y: float) -> tuple[float, float]:
+        return (origin + (x / 100.0 * box), origin + (y / 100.0 * box))
 
-    # Der Strahl bleibt bewusst halbtransparent — hell genug, um zu leuchten,
-    # aber der Lichtpunkt darunter soll der einzige ganz helle Fleck sein.
-    fade = Image.linear_gradient("L").resize((s, s)).point(
-        lambda value: int(255 * (0.30 + 0.44 * (value / 255.0))))
-    beam = ImageChops.multiply(beam, fade)
-    # Alles Licht bleibt innerhalb der Fläche — sonst franst der Schein am
+    # ── Die Strahlen: runde Enden, damit die Marke freundlich bleibt ───────
+    mark = Image.new("L", (s, s), 0)
+    draw = ImageDraw.Draw(mark)
+    cap = stroke / 2.0
+    for start, end in RAYS:
+        x1, y1 = point(*start)
+        x2, y2 = point(*end)
+        draw.line([(x1, y1), (x2, y2)], fill=255, width=max(2, int(round(stroke))))
+        for x, y in ((x1, y1), (x2, y2)):
+            draw.ellipse([x - cap, y - cap, x + cap, y + cap], fill=255)
+
+    # Nur ein Hauch Weichzeichnen: die Marke soll klar bleiben, nicht leuchten.
+    mark = mark.filter(ImageFilter.GaussianBlur(s * (0.004 if small else 0.003)))
+    # Alles Licht bleibt innerhalb der Fläche — sonst franst die Marke am
     # Rand des Symbols aus und wird hart abgeschnitten.
-    beam = ImageChops.multiply(beam, face)
-    image.paste(Image.new("RGBA", (s, s), (*CORE, 255)), (0, 0), beam)
+    mark = ImageChops.multiply(mark, face)
+    image.paste(Image.new("RGBA", (s, s), (*CORE, 245)), (0, 0), mark)
 
-    # ── Lichtpunkt (die Quelle) mit weichem Hof ────────────────────────────
-    halo = Image.new("L", (s, s), 0)
-    halo_draw = ImageDraw.Draw(halo)
-    halo_draw.ellipse(
-        [center_x - orb_r * 2.3, orb_y - orb_r * 2.3,
-         center_x + orb_r * 2.3, orb_y + orb_r * 2.3],
-        fill=120)
-    halo = ImageChops.multiply(halo.filter(ImageFilter.GaussianBlur(s * 0.05)), face)
-    image.paste(Image.new("RGBA", (s, s), (*HALO, 255)), (0, 0), halo)
+    # ── Der Lichtpunkt (die Quelle) mit weichem Hof ────────────────────────
+    point_x, point_y = point(POINT[0], POINT[1])
+    point_r = box * (POINT[2] / 100.0)
+
+    if not small:
+        halo = Image.new("L", (s, s), 0)
+        ImageDraw.Draw(halo).ellipse(
+            [point_x - point_r * 2.4, point_y - point_r * 2.4,
+             point_x + point_r * 2.4, point_y + point_r * 2.4],
+            fill=110)
+        halo = ImageChops.multiply(halo.filter(ImageFilter.GaussianBlur(s * 0.045)), face)
+        image.paste(Image.new("RGBA", (s, s), (*HALO, 255)), (0, 0), halo)
 
     orb = Image.new("L", (s, s), 0)
     ImageDraw.Draw(orb).ellipse(
-        [center_x - orb_r, orb_y - orb_r, center_x + orb_r, orb_y + orb_r],
+        [point_x - point_r, point_y - point_r, point_x + point_r, point_y + point_r],
         fill=255)
-    orb = ImageChops.multiply(orb.filter(ImageFilter.GaussianBlur(s * 0.008)), face)
+    orb = ImageChops.multiply(orb.filter(ImageFilter.GaussianBlur(s * 0.006)), face)
     image.paste(Image.new("RGBA", (s, s), (*CORE, 255)), (0, 0), orb)
 
     return image.resize((size, size), Image.LANCZOS)
+
+
+def write_logo() -> None:
+    """Dieselbe Marke als Bild für das README — aus der 256-px-Ebene."""
+    LOGO.parent.mkdir(parents=True, exist_ok=True)
+    render(256).save(LOGO, format="PNG", optimize=True)
+    print(f"{LOGO} geschrieben ({LOGO.stat().st_size / 1024:.1f} kB)")
 
 
 def png_bytes(image: Image.Image) -> bytes:
@@ -144,6 +165,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_bytes(header + directory + blobs)
     print(f"{OUT} geschrieben ({OUT.stat().st_size / 1024:.1f} kB, {len(entries)} Größen)")
+    write_logo()
     return 0
 
 

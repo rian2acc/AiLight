@@ -58,7 +58,8 @@ public static class Icons
 
     /// <summary>
     /// Notfallsymbol, falls die Datei fehlt: dieselbe Marke wie im Programmsymbol —
-    /// abgerundete Fläche, darin ein Lichtstrahl, der aus einem Punkt aufgeht.
+    /// abgerundete Fläche, darin der Lichtpunkt mit den drei Strahlen, die
+    /// zusammen „AI“ ergeben.
     /// </summary>
     public static Icon Draw(int size, string accent = Views.Theme.DefaultAccent)
     {
@@ -86,41 +87,48 @@ public static class Icons
             var clip = graphics.Clip;
             graphics.SetClip(face);
 
-            var centerX = size * 0.5f;
-            var orbY = size * 0.80f;
-            var orbRadius = size * 0.108f;
+            // Die Marke: Lichtpunkt oben, daraus gehen drei Strahlen nach unten.
+            // Die beiden äußeren Strahlen mit dem Querstrich dazwischen bilden
+            // ein A, der mittlere Strahl ist das I. Dieselben Maße wie in
+            // tools/make_icon.py und Views/Theme.xaml (Raster 100 × 100).
+            var small = size <= 24;
+            var box = size * (small ? 0.70f : 0.64f);
+            var origin = (size - box) / 2f;
+            var stroke = box * 0.11f * (small ? 1.12f : 1f);
 
-            // Strahl: unten schmal, nach oben offen, halbtransparent und nach oben verblassend.
-            using (var beam = new GraphicsPath())
+            PointF At(float x, float y)
+                => new(origin + (x / 100f * box), origin + (y / 100f * box));
+
+            using (var pen = new System.Drawing.Pen(Color.FromArgb(245, 255, 255, 255), stroke))
             {
-                beam.AddPolygon(new[]
-                {
-                    new PointF(centerX - (size * 0.20f), size * 0.15f),
-                    new PointF(centerX + (size * 0.20f), size * 0.15f),
-                    new PointF(centerX + (size * 0.042f), orbY - (orbRadius * 0.55f)),
-                    new PointF(centerX - (size * 0.042f), orbY - (orbRadius * 0.55f)),
-                });
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+                pen.LineJoin = LineJoin.Round;
 
-                using var fade = new System.Drawing.Drawing2D.LinearGradientBrush(
-                    new RectangleF(0, 0, size, size),
-                    Color.FromArgb(80, 255, 255, 255),
-                    Color.FromArgb(190, 255, 255, 255),
-                    90f);
-                graphics.FillPath(fade, beam);
+                graphics.DrawLine(pen, At(50, 32), At(50, 90));   // das I
+                graphics.DrawLine(pen, At(44, 32), At(22, 90));   // linker Schenkel
+                graphics.DrawLine(pen, At(56, 32), At(78, 90));   // rechter Schenkel
+                graphics.DrawLine(pen, At(30, 68), At(70, 68));   // Querstrich des A
             }
 
-            // Der Lichtpunkt: weicher Hof, dann der helle Kern.
-            using (var halo = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+            // Der Lichtpunkt (die Quelle): weicher Hof, dann der helle Kern.
+            var point = At(50, 14);
+            var pointRadius = box * 0.095f;
+
+            if (!small)
             {
+                using var halo = new SolidBrush(Color.FromArgb(110, 255, 255, 255));
+                var haloRadius = pointRadius * 2.4f;
                 graphics.FillEllipse(halo,
-                    centerX - (orbRadius * 2.3f), orbY - (orbRadius * 2.3f),
-                    orbRadius * 4.6f, orbRadius * 4.6f);
+                    point.X - haloRadius, point.Y - haloRadius,
+                    haloRadius * 2, haloRadius * 2);
             }
 
             using (var core = new SolidBrush(Color.White))
             {
                 graphics.FillEllipse(core,
-                    centerX - orbRadius, orbY - orbRadius, orbRadius * 2, orbRadius * 2);
+                    point.X - pointRadius, point.Y - pointRadius,
+                    pointRadius * 2, pointRadius * 2);
             }
 
             graphics.Clip = clip;

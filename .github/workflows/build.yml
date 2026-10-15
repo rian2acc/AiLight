@@ -37,7 +37,7 @@ jobs:
       - name: Build (Release)
         run: dotnet build src/AIlight/AIlight.csproj -c Release --no-restore
 
-      - name: Run Self-Test (48 assertions)
+      - name: Run Self-Test (52 assertions)
         run: |
           # Gleicher Publish wie tools/build.ps1: self-contained, ohne Trimmen —
           # Trimmen unterstützt WPF/WinForms nicht (NETSDK1175) und kann Laufzeitcode entfernen.

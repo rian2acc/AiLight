@@ -36,14 +36,52 @@
     <FontFamily x:Key="Font.Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
 
     <!--
-      Die Marke als Vektorgrafik: ein Lichtstrahl, der aus einem Punkt nach oben
-      aufgeht. Dieselbe Form wie im Programmsymbol (tools/make_icon.py) — bewusst
-      kein vierstrahliges „Funkeln“, sondern das Bild von AIlight selbst.
+      Die Marke: ein leuchtender Punkt oben, daraus gehen drei Strahlen nach
+      unten. Die beiden äußeren Strahlen und der Querstrich dazwischen bilden
+      ein A, der mittlere Strahl ist das I — „AI“ als ein einziges Bild. Die
+      Maße stehen auch in tools/make_icon.py und in Core/Icons.cs; alle drei
+      zeichnen dieselbe Form.
     -->
-    <GeometryGroup x:Key="Icon.Beam" FillRule="Nonzero">
-        <PathGeometry Figures="M 29,14 L 71,14 L 56,76 L 44,76 Z" />
-        <EllipseGeometry Center="50,85" RadiusX="11.5" RadiusY="11.5" />
+    <GeometryGroup x:Key="Icon.Ai">
+        <LineGeometry StartPoint="50,32" EndPoint="50,90" />
+        <LineGeometry StartPoint="44,32" EndPoint="22,90" />
+        <LineGeometry StartPoint="56,32" EndPoint="78,90" />
+        <LineGeometry StartPoint="30,68" EndPoint="70,68" />
     </GeometryGroup>
+
+    <!--
+      Die Marke in jeder Größe: die Form skaliert über eine Viewbox, gefärbt
+      wird sie mit dem Akzent. Runde Enden und runde Ecken lassen sie freundlich
+      wirken — dieselbe Anmutung wie die Symbole von macOS.
+    -->
+    <Style x:Key="Mark" TargetType="Control">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Control">
+                    <Viewbox Stretch="Uniform">
+                        <Canvas Width="100" Height="100">
+                            <Path
+                                Data="{StaticResource Icon.Ai}"
+                                Stroke="{DynamicResource Brush.Accent}"
+                                StrokeEndLineCap="Round"
+                                StrokeLineJoin="Round"
+                                StrokeStartLineCap="Round"
+                                StrokeThickness="11" />
+                            <Ellipse
+                                Canvas.Left="40.5"
+                                Canvas.Top="4.5"
+                                Width="19"
+                                Height="19"
+                                Fill="{DynamicResource Brush.Accent}" />
+                        </Canvas>
+                    </Viewbox>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!--  ── Schrift ─────────────────────────────────────────────────────────  -->
     <Style x:Key="Title" TargetType="TextBlock">
@@ -91,8 +129,8 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.CardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Card}" />
-        <Setter Property="Padding" Value="16,12" />
-        <Setter Property="Margin" Value="0,0,0,14" />
+        <Setter Property="Padding" Value="18,15" />
+        <Setter Property="Margin" Value="0,0,0,16" />
     </Style>
 
     <Style x:Key="Line" TargetType="Border">
@@ -190,9 +228,40 @@
                             Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!--  Hover blendet weich ein, statt umzuschalten — der Ampel-Knopf atmet.  -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Glyph" Property="Opacity" Value="1" />
-                            <Setter TargetName="Shell" Property="Opacity" Value="0.82" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Glyph"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.12" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0.82"
+                                            Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Glyph"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.18" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
@@ -212,6 +281,11 @@
     </Style>
 
     <!--  ── Knöpfe ──────────────────────────────────────────────────────────  -->
+    <!--
+      Ein stiller Knopf: die Fläche bleibt ruhig, Beleuchtung und Akzentkante
+      kommen als eigene Lagen darüber und blenden weich ein. Ein harter
+      Farbwechsel wirkt daneben wie ein Schalter, nicht wie ein Knopf.
+    -->
     <Style x:Key="Button.Ghost" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
         <Setter Property="FontFamily" Value="{DynamicResource Font.Ui}" />
@@ -222,19 +296,103 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border
-                        x:Name="Shell"
-                        Background="{DynamicResource Brush.Card}"
-                        BorderBrush="{DynamicResource Brush.FieldBorder}"
-                        BorderThickness="1"
-                        CornerRadius="{DynamicResource Radius.Field}"
-                        Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="Press" ScaleX="1" ScaleY="1" />
+                        </Grid.RenderTransform>
+                        <Border
+                            x:Name="Shell"
+                            Background="{DynamicResource Brush.Card}"
+                            BorderBrush="{DynamicResource Brush.FieldBorder}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Field}"
+                            Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border
+                            x:Name="Glow"
+                            Margin="1"
+                            Background="{DynamicResource Brush.Hover}"
+                            CornerRadius="{DynamicResource Radius.Field}"
+                            IsHitTestVisible="False"
+                            Opacity="0" />
+                        <Border
+                            x:Name="Edge"
+                            BorderBrush="{DynamicResource Brush.Accent}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Field}"
+                            IsHitTestVisible="False"
+                            Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shell" Property="Background" Value="{DynamicResource Brush.Hover}" />
-                            <Setter TargetName="Shell" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Glow"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.12" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Edge"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Glow"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.2" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Edge"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.2" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <!--  Beim Drücken geht der Knopf einen Hauch zusammen (wie in macOS).  -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Press"
+                                            Storyboard.TargetProperty="ScaleX"
+                                            To="0.97"
+                                            Duration="0:0:0.08" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Press"
+                                            Storyboard.TargetProperty="ScaleY"
+                                            To="0.97"
+                                            Duration="0:0:0.08" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Press"
+                                            Storyboard.TargetProperty="ScaleX"
+                                            To="1"
+                                            Duration="0:0:0.14" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Press"
+                                            Storyboard.TargetProperty="ScaleY"
+                                            To="1"
+                                            Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -263,7 +421,52 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shell" Property="Opacity" Value="0.88" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0.88"
+                                            Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0.78"
+                                            Duration="0:0:0.08" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Shell"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -308,39 +511,99 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border
-                        x:Name="Shell"
-                        Background="Transparent"
-                        CornerRadius="{DynamicResource Radius.Field}"
-                        Padding="10,8">
+                    <Border x:Name="Shell" Background="Transparent" CornerRadius="{DynamicResource Radius.Field}">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                            <!--  Beleuchtung und Auswahl liegen als eigene Lagen unter dem Text und blenden weich ein.  -->
                             <Border
-                                x:Name="Marker"
-                                Width="3"
-                                Margin="0,0,9,0"
-                                Background="Transparent"
-                                CornerRadius="2" />
-                            <ContentPresenter
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                TextBlock.FontFamily="{DynamicResource Font.Ui}"
-                                TextBlock.FontSize="13" />
+                                x:Name="Hover"
+                                Background="{DynamicResource Brush.Hover}"
+                                CornerRadius="{DynamicResource Radius.Field}"
+                                Opacity="0" />
+                            <Border
+                                x:Name="Select"
+                                Background="{DynamicResource Brush.Selection}"
+                                CornerRadius="{DynamicResource Radius.Field}"
+                                Opacity="0" />
+                            <Grid Margin="10,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    x:Name="Marker"
+                                    Width="3"
+                                    Margin="0,0,9,0"
+                                    Background="{DynamicResource Brush.Accent}"
+                                    CornerRadius="2"
+                                    Opacity="0" />
+                                <ContentPresenter
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    TextBlock.FontFamily="{DynamicResource Font.Ui}"
+                                    TextBlock.FontSize="13" />
+                            </Grid>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shell" Property="Background" Value="{DynamicResource Brush.Hover}" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Hover"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Hover"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Shell" Property="Background" Value="{DynamicResource Brush.Selection}" />
-                            <Setter TargetName="Marker" Property="Background" Value="{DynamicResource Brush.Accent}" />
                             <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
                             <Setter Property="FontWeight" Value="SemiBold" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Select"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.16" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Marker"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Select"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.18" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Marker"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -351,7 +614,6 @@
     <!--  Ein Eintrag der Vorschlagsliste  -->
     <Style x:Key="Suggest.Row" TargetType="Border">
         <Setter Property="CornerRadius" Value="{DynamicResource Radius.Row}" />
-        <Setter Property="Padding" Value="10,0" />
         <Setter Property="Margin" Value="8,1" />
         <Setter Property="Height" Value="40" />
         <Setter Property="Background" Value="Transparent" />
@@ -610,33 +872,89 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border
-                            x:Name="Track"
-                            Width="38"
-                            Height="22"
-                            VerticalAlignment="Center"
-                            Background="{DynamicResource Brush.Track}"
-                            CornerRadius="11">
+                        <Grid VerticalAlignment="Center">
+                            <Border
+                                x:Name="Track"
+                                Width="38"
+                                Height="22"
+                                Background="{DynamicResource Brush.Track}"
+                                CornerRadius="11" />
+                            <!--  Der eingeschaltete Zustand liegt als eigene Lage darüber und blendet weich ein.  -->
+                            <Border
+                                x:Name="TrackOn"
+                                Width="38"
+                                Height="22"
+                                Background="{DynamicResource Brush.Accent}"
+                                CornerRadius="11"
+                                Opacity="0" />
                             <Border
                                 x:Name="Knob"
                                 Width="16"
                                 Height="16"
                                 Margin="3,0,0,0"
                                 HorizontalAlignment="Left"
-                                Background="{DynamicResource Brush.Muted}"
-                                CornerRadius="8" />
-                        </Border>
+                                Background="#FFFFFFFF"
+                                CornerRadius="8">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="KnobShift" X="0" />
+                                </Border.RenderTransform>
+                                <Border.Effect>
+                                    <DropShadowEffect
+                                        BlurRadius="4"
+                                        Color="#40000000"
+                                        Opacity="0.5"
+                                        ShadowDepth="1" />
+                                </Border.Effect>
+                            </Border>
+                        </Grid>
                         <ContentPresenter
                             Grid.Column="1"
                             Margin="11,0,0,0"
                             VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <!--  Der Knopf fährt hinüber, statt zu springen — wie ein Schalter in macOS.  -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource Brush.Accent}" />
-                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                            <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
-                            <Setter TargetName="Knob" Property="Background" Value="#FFFFFFFF" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="TrackOn"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.16" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="KnobShift"
+                                            Storyboard.TargetProperty="X"
+                                            To="16"
+                                            Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="TrackOn"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.2" />
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="KnobShift"
+                                            Storyboard.TargetProperty="X"
+                                            To="0"
+                                            Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Track" Property="Opacity" Value="0.85" />
@@ -661,11 +979,17 @@
                 <ControlTemplate TargetType="ToggleButton">
                     <Grid>
                         <Border
-                            x:Name="Ring"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
+                            x:Name="HoverRing"
+                            BorderBrush="{DynamicResource Brush.Hover}"
                             BorderThickness="2"
-                            CornerRadius="10" />
+                            CornerRadius="10"
+                            Opacity="0" />
+                        <Border
+                            x:Name="CheckRing"
+                            BorderBrush="{DynamicResource Brush.Text}"
+                            BorderThickness="2"
+                            CornerRadius="10"
+                            Opacity="0" />
                         <Border
                             x:Name="Face"
                             Margin="3"
@@ -674,10 +998,52 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Brush.Hover}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="HoverRing"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="HoverRing"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Brush.Text}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="CheckRing"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="1"
+                                            Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="CheckRing"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0"
+                                            Duration="0:0:0.16" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

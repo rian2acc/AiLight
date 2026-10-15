@@ -274,6 +274,9 @@ public sealed class App : Application
             _settings.WindowState = WindowState.Normal;
         }
 
+        // Jetzt erst, und nur hier: Der Auftritt gehört dem echten Öffnen. Für
+        // Prüfstand und Bilder wird dasselbe Fenster ohne Bewegung gerendert.
+        _settings.PlayEntrance();
         _settings.Activate();
     }
 

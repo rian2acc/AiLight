@@ -27,6 +27,12 @@ public static class Motion
     /// <summary>Scrollen zu einer Stelle.</summary>
     public const int GlideMs = 200;
 
+    /// <summary>Seitenwechsel in den Einstellungen — etwas ruhiger als ein Detail.</summary>
+    public const int PageMs = 220;
+
+    /// <summary>Wie weit eine neue Seite beim Erscheinen aufsteigt.</summary>
+    public const double PageRise = 8;
+
     /// <summary>Wie weit die Leiste beim Erscheinen aufsteigt (WPF-Einheiten).</summary>
     public const double Rise = 10;
 

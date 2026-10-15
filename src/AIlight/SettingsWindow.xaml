@@ -21,7 +21,10 @@
       Karte. Kein Systemrahmen — eigener Streifen zum Ziehen, eigene Knöpfe.
     -->
 
-    <Grid Margin="18">
+    <Grid x:Name="Root" Margin="18">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="RootShift" Y="0" />
+        </Grid.RenderTransform>
         <Border Style="{StaticResource Chrome.ShadowLayer}" />
         <Border Style="{StaticResource Chrome.Shell}">
             <Grid>
@@ -61,13 +64,11 @@
                         VerticalAlignment="Center"
                         IsHitTestVisible="False"
                         Orientation="Horizontal">
-                        <Path
-                            Width="17"
-                            Height="17"
+                        <Control
+                            Width="18"
+                            Height="18"
                             VerticalAlignment="Center"
-                            Data="{StaticResource Icon.Beam}"
-                            Fill="{DynamicResource Brush.Accent}"
-                            Stretch="Uniform" />
+                            Style="{StaticResource Mark}" />
                         <TextBlock
                             Margin="8,0,0,0"
                             VerticalAlignment="Center"
@@ -471,14 +472,12 @@
                                                         VerticalAlignment="Center"
                                                         Background="{DynamicResource Brush.Selection}"
                                                         CornerRadius="9">
-                                                        <Path
-                                                            Width="15"
-                                                            Height="15"
+                                                        <Control
+                                                            Width="16"
+                                                            Height="16"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Center"
-                                                            Data="{StaticResource Icon.Beam}"
-                                                            Fill="{DynamicResource Brush.Accent}"
-                                                            Stretch="Uniform" />
+                                                            Style="{StaticResource Mark}" />
                                                     </Border>
                                                     <TextBlock
                                                         x:Name="PreviewText"
@@ -756,13 +755,11 @@
                                 <Border Style="{StaticResource Card}">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal">
-                                            <Path
-                                                Width="20"
-                                                Height="20"
+                                            <Control
+                                                Width="22"
+                                                Height="22"
                                                 VerticalAlignment="Center"
-                                                Data="{StaticResource Icon.Beam}"
-                                                Fill="{DynamicResource Brush.Accent}"
-                                                Stretch="Uniform" />
+                                                Style="{StaticResource Mark}" />
                                             <TextBlock
                                                 Margin="10,0,0,0"
                                                 VerticalAlignment="Center"

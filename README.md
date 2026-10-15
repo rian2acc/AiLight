@@ -18,9 +18,11 @@
 
 ---
 
-> **Das Logo** ist ein Lichtstrahl, der aus einem leuchtenden Punkt aufgeht — bewusst kein
-> vierstrahliges „KI-Funkeln“. Dieselbe Marke sitzt als Vektorgrafik in der Leiste,
-> im Einstellungsfenster und im Programmsymbol (`tools/make_icon.py` erzeugt es reproduzierbar).
+> **Das Logo** ist ein leuchtender Punkt, aus dem drei Strahlen nach unten gehen — die
+> beiden äußeren bilden mit dem Querstrich dazwischen ein **A**, der mittlere Strahl ist das
+> **I**. So steckt der Name als ein einziges Bild in der Marke, bewusst kein vierstrahliges
+> „KI-Funkeln“. Dieselbe Form sitzt als Vektorgrafik in der Leiste, im Einstellungsfenster
+> und im Programmsymbol (`tools/make_icon.py` erzeugt es reproduzierbar aus einem Raster).
 
 ## ✨ Funktionen
 
@@ -29,7 +31,9 @@
 | **Globaler Hotkey** | `Alt+Space` (frei wählbar) — sofort da, aus jedem Programm |
 | **Streaming-Antworten** | Der Text erscheint Wort für Wort über die Groq-API |
 | **Smarte Vorschläge** | Frühere Fragen, Befehle, Zwischenablage — per Tastatur bedienbar |
+| **Neue Marke** | Leuchtender Punkt oben, drei Strahlen nach unten — die äußeren ergeben mit dem Querstrich ein **A**, der mittlere ist das **I** |
 | **macOS-Look** | Ruhige Flächen, Haarlinien, großzügige Ecken, ein Lichtschein von oben, Ampel-Knöpfe in den Einstellungen |
+| **Überall weich** | Auftritt der Leiste, Wechsel der Einstellungs-Seiten, Hover, Regler und Markierung: alles blendet über statt umzuspringen |
 | **Weicher Auftritt** | Die Leiste steigt auf und wächst einen Hauch — Auftritt 180 ms, Abgang 130 ms, kubisch ausklingend |
 | **Nichts springt** | Vorschlagsliste und Antwort gleiten: Auswahl wandert weich ins Bild, wachsender Text zieht sanft nach |
 | **Schwebt nie im Weg** | Öffnen die Einstellungen, zieht sich die Leiste zurück — und holt sich dabei keinen fremden Fokus |
@@ -37,7 +41,7 @@
 | **Gesprächsgedächtnis** | Einstellbare Runden, `/forget` löscht |
 | **Verlauf & Statistik** | Tokens, Kostenschätzung, durchsuchbar, exportierbar |
 | **Infobereich** | Nur eine Instanz, Autostart, kein Hintergrunddienst |
-| **Selbsttest eingebaut** | `AIlight.exe --selftest` → 48 Prüfungen, teils auf Pixel-Ebene |
+| **Selbsttest eingebaut** | `AIlight.exe --selftest` → 52 Prüfungen, teils auf Pixel-Ebene |
 | **Installer** | 48,5 MB (≈46 MiB) Inno-Setup-Bündel — inklusive .NET, ohne Administratorrechte, pro Benutzer |
 
 ## 📥 Installation
@@ -62,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File tools\build.ps1
 # Ergebnis: dist\installer\AIlightSetup.exe
 ```
 
-> Das Skript läuft den 48-Punkte-Selbsttest, veröffentlicht eine
+> Das Skript läuft den 52-Punkte-Selbsttest, veröffentlicht eine
 
 > self-contained EXE-Mappe (kein .NET nötig) und packt den Installer. Schalter: `-SkipTest`, `-SkipInstaller`.
 
@@ -113,7 +117,7 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 | Ecken-Radius | 8–22 — Leiste, Karten, Felder und Zeilen skalieren gemeinsam |
 | Schrift | System (Segoe UI Variable), Segoe UI, Calibri, Arial |
 | Leiste | Breite 420–1200, Abstand von oben 0–40, Schriftgröße 12–28, Deckkraft 60–100 % |
-| Bewegung | Auftritt und Abgang der Leiste, Nachziehen des Textes, Impuls an/aus |
+| Bewegung | Auftritt und Abgang der Leiste, Überblenden der Seiten und Bedienelemente, Nachziehen des Textes, Impuls an/aus |
 | Antwort | Denk-Schritte automatisch aufklappen, Fußzeile (Modell · Tokens · Kosten) ein/aus |
 | Verhalten | Hotkey, Autostart, Vorbereiten im Hintergrund, Schließen bei Fokusverlust, Protokoll |
 
@@ -147,7 +151,7 @@ Das ganze Aussehen ist einstellbar — jede Änderung wirkt sofort, ohne Neustar
 ## 🛠️ Eingebaute Diagnose
 
 ```powershell
-AIlight.exe --selftest           # 48 Prüfungen, Rückgabewert 0 = bestanden
+AIlight.exe --selftest           # 52 Prüfungen, Rückgabewert 0 = bestanden
 AIlight.exe --smoke 4            # Leiste, Hotkey, Infobereich, Größe, Position
 AIlight.exe --ask "Sag: ok"      # Frage ohne Fenster
 AIlight.exe --ask-ui "2+2?"      # Simulierte Bedienung der Leiste
@@ -157,8 +161,11 @@ AIlight.exe --quit               # Laufende Instanz beenden
 AIlight.exe --report out.txt     # Messläufe in eine Datei schreiben
 ```
 Der Selbsttest zeichnet echte Fenster und prüft **echte Pixel** — zum Beispiel muss der
-gefüllte Teil eines Reglers links in der Akzentfarbe stehen und eine markierte
-Vorschlagszeile ihren Akzentstreifen an der erwarteten Stelle zeigen.
+gefüllte Teil eines Reglers links in der Akzentfarbe stehen, eine markierte
+Vorschlagszeile ihren Akzentstreifen an der erwarteten Stelle zeigen und die neue Marke
+in der Leiste wirklich als A mit Lichtpunkt und Mittelstrahl ankommen. Auch die
+Überblendungen werden nachgemessen: mitten im Wechsel muss die Deckkraft zwischen 0 und 1
+liegen und am Ende genau 1 oder 0 sein — kein halb sichtbarer Rest.
 
 ## 🏗️ Aufbau
 
@@ -169,7 +176,7 @@ src/AIlight/
   MainWindow.*         Die Leiste: Eingabe, Vorschläge, Streaming-Markdown
   SettingsWindow.*     Sieben Bereiche, Live-Vorschau, eigener Rahmen
   AppSettings.cs       Einstellungen laden/speichern (JSON)
-  SelfTest.cs          48 Prüfungen, teils auf Pixel-Ebene
+  SelfTest.cs          52 Prüfungen, teils auf Pixel-Ebene
   Commands.cs          Register der Schrägstrich-Befehle
   Suggestions.cs       Vorschlagszeilen unter der Eingabe
   Core/                Hotkey, Einzelinstanz, Schlüsselspeicher, Protokoll, Symbole, Pfade, atomares Schreiben
@@ -188,7 +195,7 @@ docs/bilder/           Bilder für dieses README
 - **Selbsttest steckt in der EXE** — geprüft wird genau das, was Nutzer starten
 - **Schlüssel im Anmeldeinformationsspeicher** — berührt nie die Festplatte
 - **macOS-inspiriertes Designsystem** — eine Themendatei steuert Farben, Radien und Schrift; jedes Fenster folgt live
-- **Eigene Marke**: Lichtstrahl aus einem Punkt — wiedererkennbar, kein Standard-Funkeln
+- **Eigene Marke**: Lichtpunkt mit drei Strahlen, in denen „AI“ steckt — aus einer einzigen Maßtabelle in Symbol, Vektorgrafik und Notfallzeichnung
 
 ## 📊 Messwerte (Release, dieser Rechner)
 

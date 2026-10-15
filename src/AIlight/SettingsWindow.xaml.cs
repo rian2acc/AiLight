@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using AIlight.Core;
 using AIlight.Groq;
 using AIlight.Views;
@@ -104,6 +105,23 @@ public partial class SettingsWindow : Window
     internal FrameworkElement PreviewForTest => PreviewCard;
 
     internal void SelectAreaForTest(string key) => ShowPage(key);
+
+    /// <summary>Deckkraft des ganzen Fensters (Prüfstand: Auftritt und Grundstellung).</summary>
+    internal double RootOpacityForTest => Root.Opacity;
+
+    /// <summary>Auftrieb des Fensters (0 = Grundstellung).</summary>
+    internal double RootShiftForTest => RootShift.Y;
+
+    /// <summary>Hängt am Auftritt eine Bewegung? (Prüfstand)</summary>
+    internal bool RootAnimatedForTest => Root.HasAnimatedProperties;
+
+    internal double PageOpacityForTest(string key) => _pages[key].Opacity;
+
+    internal double PageShiftForTest(string key)
+        => _pages[key].RenderTransform is TranslateTransform shift ? shift.Y : 0;
+
+    /// <summary>Läuft auf dieser Seite eine Bewegung? (Prüfstand)</summary>
+    internal bool PageAnimatedForTest(string key) => _pages[key].HasAnimatedProperties;
 
     // ── Aufbau ──────────────────────────────────────────────────────────────
 
@@ -306,6 +324,73 @@ public partial class SettingsWindow : Window
         }
 
         PageScroll.ScrollToTop();
+        RevealPage(_pages[key]);
+    }
+
+    /// <summary>
+    /// Die gewechselte Seite taucht auf, statt zu springen: kurzes Einblenden mit
+    /// einem Hauch Auftrieb — dieselbe Bewegung wie in der Leiste.
+    ///
+    /// Nur im echten Fenster: Beim Rendern für Prüfstand und Bilder wären halb
+    /// sichtbare Seiten wertlos, deshalb dort ohne Bewegung.
+    /// </summary>
+    private void RevealPage(FrameworkElement page)
+    {
+        page.BeginAnimation(OpacityProperty, null);
+        page.Opacity = 1;
+
+        if (page.RenderTransform is TranslateTransform previous)
+        {
+            previous.BeginAnimation(TranslateTransform.YProperty, null);
+            previous.Y = 0;
+        }
+
+        // Ausserhalb eines echten Fensters (Prüfstand, Bilder) und bei
+        // abgeschalteter Bewegung bleibt die Seite einfach stehen.
+        if (!IsVisible || !_settings.AnimateBar)
+        {
+            return;
+        }
+
+        var shift = page.RenderTransform as TranslateTransform;
+        if (shift is null)
+        {
+            shift = new TranslateTransform();
+            page.RenderTransform = shift;
+        }
+
+        page.Opacity = 0;
+        shift.Y = Motion.PageRise;
+        page.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.PageMs));
+        shift.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(Motion.PageRise, 0, Motion.After(Motion.PageMs))
+            {
+                EasingFunction = Motion.Out,
+            });
+    }
+
+    /// <summary>
+    /// Der Auftritt des Fensters selbst: kurz einblenden und einen Hauch aufsteigen.
+    /// Wird nur beim Öffnen aus dem Programm heraus aufgerufen — nicht beim
+    /// Rendern für Prüfstand oder Bilder.
+    /// </summary>
+    public void PlayEntrance()
+    {
+        Root.BeginAnimation(OpacityProperty, null);
+        RootShift.BeginAnimation(TranslateTransform.YProperty, null);
+        Root.Opacity = 1;
+        RootShift.Y = 0;
+
+        if (!IsVisible || !_settings.AnimateBar)
+        {
+            return;
+        }
+
+        Root.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.ShowMs));
+        RootShift.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(Motion.PageRise, 0, Motion.ShowDuration) { EasingFunction = Motion.Out });
     }
 
     // ── Fensterrahmen ───────────────────────────────────────────────────────

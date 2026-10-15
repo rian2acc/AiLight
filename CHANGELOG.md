@@ -4,6 +4,42 @@ Alle nennenswerten Änderungen an AIlight. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.0] — 2026-10-15
+
+### Neu
+
+- **Neue Marke: „AI“ als ein einziges Bild.** Ein leuchtender Punkt oben, daraus
+  gehen drei Strahlen nach unten. Die beiden äußeren ergeben mit dem Querstrich
+  dazwischen ein **A**, der mittlere Strahl ist das **I**. Eine einzige Maßtabelle
+  versorgt alles: `tools/make_icon.py` zeichnet das Programmsymbol (neun Größen,
+  16–256 px), die Vektorgrafik in den Fenstern, die Notfallzeichnung im Programm
+  (`Core/Icons.cs`) und das Logo in diesem README. Deshalb sieht die Marke in der
+  Taskleiste, im Infobereich und in der Oberfläche gleich aus — kleine Größen
+  bekommen nur kräftigere Striche, sonst verschwinden die Zwischenräume.
+- **Die Marke sitzt überall im Programm**: im Kopf der Leiste in der Akzentfarbe,
+  im Einstellungsfenster über der Navigation und noch einmal in der Vorschau des
+  Bereichs „Aussehen“, damit man dort sofort sieht, was man einstellt.
+- **Überall weiche Übergänge** statt harter Umschalter:
+  - Beim Wechsel einer Einstellungs-Seite blendet die neue Seite auf und steigt
+    8 px auf (220 ms) — vorher sprang sie ins Bild.
+  - Das Einstellungsfenster selbst blendet beim Öffnen auf.
+  - Knöpfe, Ampel-Knöpfe, Navigationszeilen, Schalter, Regler und Farbfelder
+    blenden Hover und Drücken ein, statt Farbe umzuschalten.
+  - Vorschlagszeilen bekommen eine eigene Beleuchtungsebene, die unter dem
+    Mauszeiger weich aufgeht und ebenso weich wieder verschwindet.
+
+### Geändert
+
+- Alle Zeiten und Kurven der Bewegung stehen weiter an einer Stelle
+  (`Views/Motion.cs`); neu dazugekommen sind `PageMs` (220 ms) und `PageRise`
+  (8 px) für die Seitenwechsel.
+- Wer in den Einstellungen die Bewegung abschaltet, bekommt weiterhin alles
+  sofort und ohne Überblendung — auch die Seitenwechsel.
+- Selbsttest von 48 auf **52 Prüfungen** erweitert. Neu sind zwei Marken-Prüfungen
+  auf Pixel-Ebene (Lichtpunkt oben, Mittelstrahl, Querstrich, beide Schenkel des A)
+  und eine Prüfung der Überblendungen: mitten im Wechsel muss die Deckkraft
+  zwischen 0 und 1 liegen, am Ende genau 1 oder 0 — kein halb sichtbarer Rest.
+
 ## [2.2.0] — 2026-10-15
 
 ### Neu

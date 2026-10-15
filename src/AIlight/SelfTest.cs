@@ -50,6 +50,8 @@ public static class SelfTest
         TestSuggestions();
         TestMotion();
         TestUserInterface();
+        // Die Marke liegt in den Themen-Ressourcen — deshalb erst hier.
+        TestMark();
 
         Console.WriteLine(new string('-', 60));
         Console.WriteLine($"Ergebnis: {_passed} von {_passed + Failures.Count} Prüfungen bestanden");
@@ -585,6 +587,47 @@ public static class SelfTest
                 previous = value;
             }
         });
+
+        Check("Bewegung: Seitenwechsel ist ruhiger als ein Detail", () =>
+        {
+            True(Motion.PageMs > Motion.QuickMs && Motion.PageMs <= 400,
+                $"Der Seitenwechsel ist unpassend getaktet: {Motion.PageMs} ms");
+            True(Motion.PageRise > 0 && Motion.PageRise <= 16, "Der Auftrieb der Seite ist zu groß");
+        });
+    }
+
+    // ── Marke ───────────────────────────────────────────────────────────────
+
+    private static void TestMark()
+    {
+        Check("Marke: der Lichtpunkt mit drei Strahlen ergibt A und I", () =>
+        {
+            True(Application.Current.Resources["Icon.Ai"] is GeometryGroup,
+                "Die Marke fehlt als Vektorgrafik");
+            var mark = (GeometryGroup)Application.Current.Resources["Icon.Ai"];
+            var lines = mark.Children.OfType<LineGeometry>().ToList();
+            Equal(4, lines.Count, "Strahlen und Querstrich");
+
+            // Der mittlere Strahl steht senkrecht in der Mitte — das ist das I.
+            var middle = lines.Single(line => line.StartPoint.X == 50 && line.EndPoint.X == 50);
+            True(middle.StartPoint.Y > 20 && middle.EndPoint.Y > middle.StartPoint.Y,
+                "Der mittlere Strahl läuft nicht nach unten");
+
+            // Die beiden äußeren Strahlen gehen symmetrisch nach außen — die Schenkel des A.
+            var left = lines.Single(line => line.StartPoint.X == 44);
+            var right = lines.Single(line => line.StartPoint.X == 56);
+            True(left.EndPoint.X < left.StartPoint.X && right.EndPoint.X > right.StartPoint.X,
+                "Die äußeren Strahlen spreizen nicht");
+            Equal(left.StartPoint.Y, right.StartPoint.Y, "Die Schenkel beginnen nicht auf einer Höhe");
+            Equal(100d - right.EndPoint.X, left.EndPoint.X, "Die Schenkel sind nicht symmetrisch");
+
+            // Der Querstrich liegt zwischen den Schenkeln und kreuzt den mittleren Strahl.
+            var bar = lines.Single(line => line.StartPoint.Y == line.EndPoint.Y);
+            True(bar.StartPoint.X < middle.StartPoint.X && bar.EndPoint.X > middle.StartPoint.X,
+                "Der Querstrich reicht nicht über den mittleren Strahl");
+            True(lines.Where(line => line.StartPoint.Y == line.EndPoint.Y).Count() == 1,
+                "Es gibt mehr als einen Querstrich");
+        });
     }
 
     // ── Oberfläche ──────────────────────────────────────────────────────────
@@ -789,7 +832,7 @@ public static class SelfTest
                 "Nav.Item", "Button.Primary", "Button.Ghost", "Button.Danger", "Bar.Button",
                 "Field.Text", "Field.Multiline", "Field.Secret", "Box.Select", "Box.Item",
                 "Switch", "Swatch", "Slider.Slim", "Suggest.Row", "Suggest.Subtitle",
-                "Icon.Beam", "Radius.Shell", "Radius.Card", "Radius.Field", "Radius.Row",
+                "Mark", "Icon.Ai", "Radius.Shell", "Radius.Card", "Radius.Field", "Radius.Row",
                 "Brush.Card", "Brush.Hover", "Brush.Track", "Brush.Field", "Brush.Ring",
                 "Chrome.Sheen", "Suggest.Row", "Suggest.Title", "Suggest.Glyph",
             })
@@ -917,6 +960,80 @@ public static class SelfTest
                 True(bar.AnswerBlockCount > 0, "Antwortbereich wurde geleert");
 
                 bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Oberfläche: die Leiste zeigt die neue Marke", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-mark-").FullName;
+            try
+            {
+                var settings = new AppSettings();
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var bar = new MainWindow(chat);
+                bar.ApplySettings();
+
+                var root = (FrameworkElement)bar.Content;
+                Shot.Measure(root, 680);
+
+                var chip = (Border)bar.FindName("BrandChip")!;
+                var accent = ((SolidColorBrush)Application.Current.Resources["Brush.Accent"]).Color;
+                var middleX = chip.ActualWidth / 2;
+                var middleY = chip.ActualHeight / 2;
+
+                // Die Mitte des Chips trifft den mittleren Strahl — das I der Marke.
+                var middle = Shot.PixelAt(root, InBitmap(root, chip, middleX, middleY).X,
+                    InBitmap(root, chip, middleX, middleY).Y);
+                True(Near(middle, accent), $"Der mittlere Strahl fehlt: {middle}");
+
+                // Daneben liegt die Fläche des Chips — dort darf keine Marke stehen.
+                var besideX = middleX + 6;
+                var beside = Shot.PixelAt(root, InBitmap(root, chip, besideX, middleY).X,
+                    InBitmap(root, chip, besideX, middleY).Y);
+                True(!Near(beside, accent), $"Neben dem Strahl steht auch Akzentfarbe: {beside}");
+
+                bar.Close();
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        });
+
+        Check("Einstellungen: Auftritt und Seitenwechsel sind weich, ohne Reste", () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("ailight-pages-").FullName;
+            try
+            {
+                var settings = AppSettings.Load(Path.Combine(folder, "settings.json"));
+                var history = new HistoryStore(Path.Combine(folder, "history.jsonl"));
+                var chat = new ChatService(new GroqClient(), settings, history, Path.Combine(folder, "conversation.json"));
+                var window = new SettingsWindow(settings, chat);
+
+                // Ohne Fenster (der Weg, auf dem Prüfstand und Bilder rendern)
+                // darf keine halb sichtbare Seite entstehen.
+                window.SelectAreaForTest("ueber");
+                Equal(1d, Math.Round(window.PageOpacityForTest("ueber"), 3), "Deckkraft ohne Fenster");
+                Equal(0d, Math.Round(window.PageShiftForTest("ueber"), 3), "Versatz ohne Fenster");
+                window.PlayEntrance();
+                Equal(1d, Math.Round(window.RootOpacityForTest, 3), "Auftritt ohne Fenster");
+                Equal(0d, Math.Round(window.RootShiftForTest, 3), "Auftrieb ohne Fenster");
+
+                // Im echten Fenster läuft die Bewegung wirklich.
+                Shot.Show(window);
+                window.PlayEntrance();
+                True(window.RootAnimatedForTest, "Der Auftritt hängt an keiner Bewegung");
+
+                window.SelectAreaForTest("aussehen");
+                True(window.IsAreaVisibleForTest("aussehen"), "Seite Aussehen ist nicht sichtbar");
+                True(window.PageAnimatedForTest("aussehen"), "Der Seitenwechsel blendet nicht ein");
+
+                window.Close();
             }
             finally
             {

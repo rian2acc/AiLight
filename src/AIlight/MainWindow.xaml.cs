@@ -653,7 +653,43 @@ public partial class MainWindow : Window
         _rowGlide?.Stop();
         SuggestionScroll.ScrollToTop();
         UpdateSelectionVisual();
+
+        var wasVisible = SuggestionList.Visibility == Visibility.Visible;
         SuggestionList.Visibility = _rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (_rows.Count > 0 && !wasVisible)
+        {
+            RevealList();
+        }
+    }
+
+    /// <summary>Die Vorschlagsliste taucht auf — kurz und weich, statt zu erscheinen.</summary>
+    private void RevealList()
+    {
+        SuggestionScroll.BeginAnimation(OpacityProperty, null);
+        SuggestionScroll.Opacity = 1;
+        if (CanAnimate)
+        {
+            SuggestionScroll.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
+        }
+    }
+
+    /// <summary>Die Denk-Schritte tauchen einmal auf — nicht bei jedem Zeichentakt.</summary>
+    private void RevealThinking()
+    {
+        ThinkingBox.BeginAnimation(OpacityProperty, null);
+        ThinkingBox.Opacity = 1;
+        if (CanAnimate)
+        {
+            ThinkingBox.BeginAnimation(OpacityProperty, Motion.Fade(0, 1, Motion.QuickMs));
+        }
+    }
+
+    /// <summary>Denk-Schritte wieder wegnehmen (ohne stehengebliebene Animation).</summary>
+    private void HideThinking()
+    {
+        ThinkingBox.BeginAnimation(OpacityProperty, null);
+        ThinkingBox.Opacity = 1;
+        ThinkingBox.Visibility = Visibility.Collapsed;
     }
 
     private void MoveSelection(int delta)
@@ -883,7 +919,7 @@ public partial class MainWindow : Window
         InvalidateAnswer();
         StopSpinner();
         AnswerBox.Visibility = Visibility.Collapsed;
-        ThinkingBox.Visibility = Visibility.Collapsed;
+        HideThinking();
         Meta.Text = "";
         SetHint("Neues Gespräch — das Gedächtnis ist leer.");
         RefreshSuggestions();
@@ -1037,7 +1073,7 @@ public partial class MainWindow : Window
         _thinking.Clear();
         _lastResult = null;
         ThinkingText.Text = "";
-        ThinkingBox.Visibility = Visibility.Collapsed;
+        HideThinking();
         AnswerPanel.Children.Clear();
         AnswerBox.Visibility = Visibility.Visible;
         _answerGlide?.Stop();
@@ -1281,7 +1317,12 @@ public partial class MainWindow : Window
 
         if (thinking.Length > 0)
         {
-            ThinkingBox.Visibility = Visibility.Visible;
+            if (ThinkingBox.Visibility != Visibility.Visible)
+            {
+                ThinkingBox.Visibility = Visibility.Visible;
+                RevealThinking();
+            }
+
             ThinkingText.Text = thinking;
 
             // Nur einmal je Frage automatisch aufklappen — danach gehört die

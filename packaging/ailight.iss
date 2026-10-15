@@ -9,7 +9,7 @@
 ; Erwartet dist\publish (dotnet publish, siehe build.ps1).
 
 #define AppName "AIlight"
-#define AppVersion "2.2.0"
+#define AppVersion "2.3.0"
 #define AppPublisher "AIlight"
 #define AppExe "AIlight.exe"
 #define SourceDir "..\dist\publish"
